@@ -4,6 +4,53 @@ const GENLAYER_RPC     = 'https://studio.genlayer.com/api';
 const CHAIN_ID         = 61999;
 const CHAIN_ID_HEX     = '0xF22F';
 
+// ─── GenLayer encoding helpers ────────────────────────────
+// Encodes method call into GenLayer calldata hex
+// Format mirrors what GenLayer Studio sends (msgpack-inspired)
+function encodeGLCall(method, args) {
+  // Build a simple length-prefixed binary format:
+  // [1 byte: num_args][2 bytes: method_len][method_bytes][for each arg: 2 bytes len + bytes]
+  const enc = new TextEncoder();
+  const methodBytes = enc.encode(method);
+  const argBufs = args.map(a => enc.encode(String(a)));
+
+  let totalLen = 1 + 2 + methodBytes.length;
+  for (const b of argBufs) totalLen += 2 + b.length;
+
+  const buf = new Uint8Array(totalLen);
+  let off = 0;
+
+  buf[off++] = args.length; // num args
+
+  // method name
+  buf[off++] = (methodBytes.length >> 8) & 0xff;
+  buf[off++] = methodBytes.length & 0xff;
+  buf.set(methodBytes, off); off += methodBytes.length;
+
+  // each arg
+  for (const b of argBufs) {
+    buf[off++] = (b.length >> 8) & 0xff;
+    buf[off++] = b.length & 0xff;
+    buf.set(b, off); off += b.length;
+  }
+
+  return '0x' + Array.from(buf).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function decodeGLResult(hexStr) {
+  // Strip 0x, decode bytes, find JSON
+  if (!hexStr || hexStr === '0x') return null;
+  const raw = hexStr.startsWith('0x') ? hexStr.slice(2) : hexStr;
+  const bytes = new Uint8Array(raw.match(/.{2}/g).map(b => parseInt(b, 16)));
+  let str = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+  // remove non-printable except whitespace
+  str = str.replace(/[^\x09\x0A\x0D\x20-\x7E]/g, '');
+  const i = str.indexOf('{');
+  const j = str.lastIndexOf('}');
+  if (i === -1 || j === -1) return null;
+  return JSON.parse(str.slice(i, j + 1));
+}
+
 // ─── STATE ────────────────────────────────────────────────
 const questions = [
   "What's your age?",
@@ -119,29 +166,6 @@ function goHome() {
 }
 
 // ─── CONTRACT ─────────────────────────────────────────────
-function encodeStr(str) {
-  const bytes = new TextEncoder().encode(str);
-  const lenHex = bytes.length.toString(16).padStart(4, '0');
-  const dataHex = Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
-  return lenHex + dataHex;
-}
-
-function buildCalldata(args) {
-  // GenLayer calldata: method name + list of string args
-  const methodName = 'find_soulmate';
-  let data = '0x';
-  // method selector: simple RLP-like encoding used by GenLayer
-  // Use their ABI format: first byte = num args, then each string length-prefixed
-  const numArgs = args.length;
-  data += numArgs.toString(16).padStart(2, '0');
-  // method name
-  data += encodeStr(methodName);
-  // args
-  for (const arg of args) {
-    data += encodeStr(arg);
-  }
-  return data;
-}
 
 async function submitToContract() {
   document.getElementById('quizScreen').classList.remove('open');
@@ -153,18 +177,17 @@ async function submitToContract() {
   ];
 
   try {
-    // Encode using GenLayer's JSON-RPC format
-    const params = {
-      from: walletAddress,
-      to: CONTRACT_ADDRESS,
-      data: buildGenLayerTx('find_soulmate', argValues)
-    };
-
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
-      params: [params]
+      params: [{
+        from: walletAddress,
+        to: CONTRACT_ADDRESS,
+        data: encodeGLCall('find_soulmate', argValues),
+        gas: '0x' + (300000).toString(16)
+      }]
     });
 
+    console.log('TX sent:', txHash);
     animateWaiting();
     await pollForResult(txHash);
 
@@ -174,14 +197,6 @@ async function submitToContract() {
     alert('Transaction failed: ' + (e.message || e));
     goHome();
   }
-}
-
-function buildGenLayerTx(method, args) {
-  // GenLayer uses msgpack-style encoding
-  // Simplest approach: encode as JSON string in hex
-  const payload = JSON.stringify({ method, args });
-  return '0x' + Array.from(new TextEncoder().encode(payload))
-    .map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
 async function pollForResult(txHash) {
@@ -232,40 +247,37 @@ async function pollForResult(txHash) {
 
 async function fetchResult() {
   try {
-    // Call get_last_match view method
-    const callPayload = JSON.stringify({ method: 'get_last_match', args: [] });
-    const callHex = '0x' + Array.from(new TextEncoder().encode(callPayload))
-      .map(b => b.toString(16).padStart(2,'0')).join('');
-
     const resp = await fetch(GENLAYER_RPC, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0', id: 1,
-        method: 'eth_call',
-        params: [{ from: walletAddress, to: CONTRACT_ADDRESS, data: callHex }, 'latest']
+        method: 'gen_call',
+        params: [{
+          from: walletAddress,
+          to: CONTRACT_ADDRESS,
+          data: encodeGLCall('get_last_match', []),
+          type: 'read',
+          value: '0x0'
+        }]
       })
     }).then(r => r.json());
 
-    let resultStr = resp?.result || '';
-    // decode hex result
-    if (resultStr.startsWith('0x')) {
-      resultStr = new TextDecoder().decode(
-        new Uint8Array(resultStr.slice(2).match(/.{2}/g).map(b => parseInt(b,16)))
-      );
-    }
-    resultStr = resultStr.replace(/[^\x20-\x7E\u0400-\u04FF]/g, '').trim();
-    const jsonStart = resultStr.indexOf('{');
-    if (jsonStart !== -1) resultStr = resultStr.slice(jsonStart);
+    console.log('gen_call response:', resp);
 
-    const match = JSON.parse(resultStr);
+    // result.data contains the hex-encoded return value
+    const hexData = resp?.result?.data || resp?.result || '';
+    const match = decodeGLResult(hexData);
+
+    if (!match) throw new Error('Could not parse result: ' + JSON.stringify(resp));
+
     hideWaiting();
     showResult(match);
 
   } catch(e) {
-    console.error(e);
+    console.error('fetchResult error:', e);
     hideWaiting();
-    alert('Could not fetch result. Check GenLayer Studio.');
+    alert('Could not fetch result: ' + e.message);
     goHome();
   }
 }
