@@ -6,8 +6,8 @@ const GENLAYER_RPC      = 'https://studio.genlayer.com/api';
 const CHAIN_ID          = 61999;
 const CHAIN_ID_HEX      = '0xF22F';
 const CONSENSUS_CONTRACT = '0xb7278A61aa25c888815aFC32Ad3cC52fF24fE575';
-const NUM_VALIDATORS    = 5n;
-const MAX_ROTATIONS     = 3n;
+const NUM_VALIDATORS    = 3n;
+const MAX_ROTATIONS     = 2n;
 const ADD_TX_SELECTOR   = '0x27241a99';
 
 const GENLAYER_NETWORK = {
@@ -712,14 +712,14 @@ async function fetchResultViaGenCall(txHash, retries = 6, delayMs = 5000) {
 
 // ─── WAITING SCREEN ───────────────────────────────────────
 const waitingMessages = [
-  "Validators are reviewing your answers...",
-  "Validator #1 is analyzing your personality...",
-  "Validator #2 is checking compatibility...",
-  "They're debating who's perfect for you...",
-  "Validator #3 disagrees with the others...",
-  "Arguments are getting heated...",
-  "Consensus is being negotiated...",
-  "Almost there — final vote in progress...",
+  "Submitting your profile to the blockchain...",
+  "3 validators are reading your answers...",
+  "Validator #1 is judging you. Lovingly.",
+  "Validator #2 found someone. Oh no.",
+  "Validator #3 disagrees. Loudly.",
+  "They're arguing about your red flag...",
+  "Two validators have reached consensus...",
+  "Final vote in progress...",
   "The blockchain has spoken ♥"
 ];
 function showWaiting() {
