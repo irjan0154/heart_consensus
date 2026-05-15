@@ -1,7 +1,7 @@
 // v4
 console.log("%c♥ HeartConsensus loaded", "color:#E8527A;font-weight:bold");
 // ─── CONFIG ───────────────────────────────────────────────
-const CONTRACT_ADDRESS  = '0x012186D2Fde2202720Af43a1d30C194A8d444505';
+const CONTRACT_ADDRESS  = '0x4B7E3dA9E7Bd377E47F884d85082b64B0153D76e';
 const GENLAYER_RPC      = 'https://studio.genlayer.com/api';
 const CHAIN_ID          = 61999;
 const CHAIN_ID_HEX      = '0xF22F';
@@ -433,11 +433,14 @@ async function connectWallet() {
       if (!accs.length) {
         walletAddress = null;
         updateWalletBtn();
+        hideNetworkBanner();
         showToast('Wallet disconnected');
         return;
       }
       walletAddress = accs[0];
       updateWalletBtn();
+      if (!await isOnCorrectNetwork()) showNetworkBanner();
+      else hideNetworkBanner();
     });
 
   } catch(e) {
@@ -448,10 +451,15 @@ async function connectWallet() {
 
 function updateWalletBtn() {
   const btn = document.querySelector('.btn-wallet');
+  if (!btn) return;
   if (walletAddress) {
     btn.textContent = walletAddress.slice(0,6) + '...' + walletAddress.slice(-4);
     btn.style.borderColor = 'rgba(232,82,122,0.4)';
     btn.style.color = '#E8527A';
+  } else {
+    btn.textContent = 'Connect Wallet';
+    btn.style.borderColor = 'rgba(58,58,69,0.18)';
+    btn.style.color = 'var(--dark, #3A3A45)';
   }
 }
 
@@ -716,16 +724,64 @@ function animateWaiting() {}
 
 // ─── RESULT SCREEN ────────────────────────────────────────
 function showResult(match) {
+  if (!match || !match.name) {
+    console.warn('showResult: invalid match object', match);
+    return;
+  }
   document.getElementById('resultName').textContent = match.name + ', ' + match.age;
-  document.getElementById('resultTagline').textContent = match.tagline;
-  document.getElementById('resultDescription').textContent = match.description;
-  document.getElementById('resultCompatibility').textContent = match.compatibility_note;
-  const imgPrompt = encodeURIComponent(match.image_prompt || match.name + ' portrait caricature style');
-  const img = document.getElementById('resultImage');
-  img.src = `https://image.pollinations.ai/prompt/${imgPrompt}?width=400&height=400&nologo=true`;
-  img.style.display = 'block';
+  document.getElementById('resultTagline').textContent = match.tagline || '';
+  document.getElementById('resultDescription').textContent = match.description || '';
+  document.getElementById('resultCompatibility').textContent = match.compatibility_note || '';
   document.getElementById('resultScreen').classList.add('open');
   document.body.style.overflow = 'hidden';
+  loadMatchImage(match);
+}
+
+function loadMatchImage(match) {
+  const img = document.getElementById('resultImage');
+  if (!img) return;
+
+  // Show placeholder while loading
+  img.style.display = 'block';
+  img.style.opacity = '0.3';
+  img.style.filter = 'blur(4px)';
+  img.src = '';
+
+  // Truncate image_prompt to max 800 chars to avoid URL limit issues
+  let prompt = match.image_prompt || '';
+  if (!prompt) {
+    prompt = match.name + ', realistic portrait photo, natural light, candid, photorealistic';
+  }
+  // Keep only up to 800 chars, cut at last space to avoid broken words
+  if (prompt.length > 800) {
+    prompt = prompt.slice(0, 800);
+    const lastSpace = prompt.lastIndexOf(' ');
+    if (lastSpace > 600) prompt = prompt.slice(0, lastSpace);
+  }
+
+  const encoded = encodeURIComponent(prompt);
+  const seed = Math.floor(Math.random() * 99999); // random seed = fresh image each time
+  const url = `https://image.pollinations.ai/prompt/${encoded}?width=512&height=512&nologo=true&seed=${seed}&model=flux`;
+
+  console.log('Image URL length:', url.length);
+
+  const tempImg = new Image();
+  tempImg.onload = () => {
+    img.src = url;
+    img.style.opacity = '1';
+    img.style.filter = 'none';
+    img.style.transition = 'opacity 0.5s, filter 0.5s';
+  };
+  tempImg.onerror = () => {
+    // Fallback: try with shorter prompt
+    const fallback = encodeURIComponent(
+      match.name + ', realistic photo portrait, natural lighting, candid, photorealistic'
+    );
+    img.src = `https://image.pollinations.ai/prompt/${fallback}?width=512&height=512&nologo=true&seed=${seed}`;
+    img.style.opacity = '1';
+    img.style.filter = 'none';
+  };
+  tempImg.src = url;
 }
 
 // ─── UTILS ────────────────────────────────────────────────
