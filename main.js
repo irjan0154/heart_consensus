@@ -1,3 +1,5 @@
+// v3
+console.log("[HeartConsensus] main.js v3 loaded");
 // ─── CONFIG ───────────────────────────────────────────────
 const CONTRACT_ADDRESS = '0xe82D69b5d0C66E19DED441Eb3c8787bf14cce571';
 const GENLAYER_RPC     = 'https://studio.genlayer.com/api';
