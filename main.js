@@ -284,11 +284,21 @@ async function pollForResult(txHash) {
         body: JSON.stringify({ jsonrpc:'2.0', id:1, method:'eth_getTransactionByHash', params:[txHash] })
       }).then(r => r.json());
 
-      const tx = resp?.result;
-      const status = tx?.statusName;
-      console.log('TX status:', status, '(attempt', attempt + ')');
+      // Log raw response first time to see structure
+      if (attempt === 1) console.log('RAW TX RESPONSE:', JSON.stringify(resp));
 
-      if (status === 'FINALIZED' || status === 'ACCEPTED') {
+      const tx = resp?.result;
+      // Try every possible status field location
+      const status = tx?.statusName
+        ?? tx?.status_name
+        ?? tx?.status
+        ?? tx?.consensus_data?.status
+        ?? tx?.data?.status;
+
+      console.log('TX status:', status, '| keys:', tx ? Object.keys(tx).join(',') : 'null', '(attempt', attempt + ')');
+
+      const DONE = ['FINALIZED','ACCEPTED','7','5'];
+      if (status !== undefined && status !== null && DONE.some(s => String(status) === s)) {
         clearInterval(interval);
         console.log('Full TX object:', JSON.stringify(tx, null, 2));
 
