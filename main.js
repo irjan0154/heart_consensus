@@ -783,6 +783,8 @@ function loadMatchImage(match) {
     img.style.opacity = '1';
     img.style.filter = 'none';
     img.style.transition = 'opacity 0.5s, filter 0.5s';
+    img.style.cursor = 'zoom-in';
+    img.onclick = () => openLightbox(url);
   };
   tempImg.onerror = () => {
     // Fallback: try with shorter prompt
@@ -794,6 +796,36 @@ function loadMatchImage(match) {
     img.style.filter = 'none';
   };
   tempImg.src = url;
+}
+
+// ─── LIGHTBOX ─────────────────────────────────────────────
+function openLightbox(src) {
+  let box = document.getElementById('hcLightbox');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'hcLightbox';
+    box.style.cssText = [
+      'position:fixed', 'inset:0', 'z-index:9999',
+      'background:rgba(0,0,0,0.85)',
+      'display:flex', 'align-items:center', 'justify-content:center',
+      'cursor:zoom-out', 'backdrop-filter:blur(6px)',
+      'opacity:0', 'transition:opacity 0.25s'
+    ].join(';');
+    box.innerHTML = '<img style="max-width:90vw;max-height:90vh;border-radius:16px;' +
+      'box-shadow:0 24px 80px rgba(0,0,0,0.6);object-fit:contain;" />';
+    box.onclick = () => closeLightbox();
+    document.body.appendChild(box);
+  }
+  box.querySelector('img').src = src;
+  box.style.display = 'flex';
+  requestAnimationFrame(() => { box.style.opacity = '1'; });
+}
+
+function closeLightbox() {
+  const box = document.getElementById('hcLightbox');
+  if (!box) return;
+  box.style.opacity = '0';
+  setTimeout(() => { box.style.display = 'none'; }, 250);
 }
 
 // ─── UTILS ────────────────────────────────────────────────
