@@ -1,7 +1,7 @@
 // v3
 console.log("[HeartConsensus] main.js v3 loaded");
 // ─── CONFIG ───────────────────────────────────────────────
-const CONTRACT_ADDRESS = '0xe82D69b5d0C66E19DED441Eb3c8787bf14cce571';
+const CONTRACT_ADDRESS = '0x3563AC42f01F295E16fdD1Bd25B26F83e6271DAd';
 const GENLAYER_RPC     = 'https://studio.genlayer.com/api';
 const CHAIN_ID              = 61999;
 const CHAIN_ID_HEX          = '0xF22F';
@@ -241,16 +241,29 @@ function extractMatchFromResult(resultB64) {
 
 // ─── STATE ────────────────────────────────────────────────
 const questions = [
-  "What's your age?",
-  "How would your friends describe you in 3 words?",
-  "What's your go-to hobby on a lazy Sunday?",
-  "Any bad habits you're not ashamed of?",
-  "What's your relationship with food?",
-  "Night owl or early bird?",
-  "What's your biggest green flag?",
+  "How old are you?",
+  "How would your ex describe you in 3 words?",
+  "Saturday 2pm. Where are you and who are you with?",
+  "Alone time is... (finish the sentence)",
+  "If your outfit could talk, what would it say?",
+  "What do you secretly judge people for?",
+  "Your last impulse purchase?",
   "What's your biggest red flag? (be honest)",
-  "What's your ideal weekend — city or nature?",
-  "Finish this sentence: My perfect partner must..."
+  "What's your biggest fear in a relationship?",
+  "Describe your perfect partner in one sentence"
+];
+
+const questionsRu = [
+  "Сколько лет?",
+  "Как бы тебя описал(а) бывший/бывшая? 3 слова",
+  "Суббота, 14:00. Где ты и с кем?",
+  "Закончи фразу: время наедине с собой — это...",
+  "Если бы твоя одежда могла говорить, что бы она сказала?",
+  "За что втихаря осуждаешь людей?",
+  "Последняя импульсивная покупка?",
+  "Твой главный красный флаг? (честно)",
+  "Твой главный страх в отношениях?",
+  "Опиши идеального партнёра одним предложением"
 ];
 let current = 0;
 const answers = [];
@@ -302,6 +315,15 @@ function startQuiz() {
 function updateQuiz() {
   document.getElementById('quizCounter').textContent = `Question ${current + 1} of ${questions.length}`;
   document.getElementById('quizQuestion').textContent = questions[current];
+  // show Russian subtitle
+  let sub = document.getElementById('quizSubtitle');
+  if (!sub) {
+    sub = document.createElement('div');
+    sub.id = 'quizSubtitle';
+    sub.style.cssText = 'font-size:13px;color:rgba(255,255,255,0.3);margin-top:-20px;margin-bottom:28px;font-style:italic;';
+    document.getElementById('quizQuestion').insertAdjacentElement('afterend', sub);
+  }
+  sub.textContent = questionsRu[current];
   document.getElementById('quizInput').value = answers[current] || '';
   document.getElementById('quizInput').focus();
   document.getElementById('progressFill').style.width = `${((current + 1) / questions.length) * 100}%`;
