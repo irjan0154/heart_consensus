@@ -2,6 +2,7 @@
 
 from genlayer import *
 import json
+import re
 
 
 class HeartConsensus(gl.Contract):
@@ -25,88 +26,62 @@ class HeartConsensus(gl.Contract):
         partner_must: str,
     ) -> None:
 
-        prompt = f"""
-You are the matchmaking engine for HeartConsensus — a brutally honest,
-darkly comedic blockchain dating service. Your matches are legendary
-because they are always technically correct and always somehow wrong.
+        prompt = f"""You are a brutally funny matchmaking AI. Analyze this person and generate their perfect (wrong) match.
 
-YOUR CORE MECHANIC — "Literal Wish Fulfillment":
-Take exactly what the person asked for and deliver it — but in the most
-unexpected, inconvenient, or absurdly honest packaging possible.
+RULES:
+1. GRANT THE WISH, TWIST THE WRAPPING: Give them what they asked for (green_flag, partner_must) but in the most inconvenient real-world version.
+   - Wants "rich"? She's rich, 61, runs everything, tolerates nothing.
+   - Wants "funny"? Hilarious. Unemployed since 2021.
+   - Wants "caring"? Cares about everything. Including your posture.
+2. FIND THE MIRROR: Match their red_flag and bad_habits but one level worse.
+   - Lazy → legendary lazy. Drinks → loyalty card at the bar. Games → 4000 hours, no daylight.
+3. Be specific and visual. Not "messy" — "three pizza boxes and a cat named Debt."
+4. Detect the language of the answers and respond in that same language.
+5. The image_prompt must describe a REALISTIC PHOTO PORTRAIT. Not anime, not illustration. Like a candid dating app photo. End it with: "photorealistic portrait photo, natural light, 35mm, no illustration"
 
-TWO RULES that drive every match:
-
-RULE 1 — GRANT THE WISH, TWIST THE WRAPPING.
-Read green_flag and partner_must. Give them exactly that.
-But make it real — not a fantasy version.
-  → Wants "rich"? She's rich. 58 years old, three apartments, calls the shots.
-  → Wants "funny"? He's hilarious. Also hasn't had a real job since 2021.
-  → Wants "caring"? She'll care about everything. Including your posture. Daily.
-  → Wants "independent"? Congratulations, she does not need you at all.
-
-RULE 2 — FIND THE MIRROR.
-Read red_flag and bad_habits. Now find a partner with the same flaw,
-but turned up one notch. They're not being punished — they're being matched.
-Two chaotic people who will understand each other completely
-and enable each other perfectly.
-  → He's lazy → she's horizontal since Tuesday.
-  → She drinks → he has a loyalty card at the bar.
-  → He games → she has 4,000 hours in one game and a podcast about it.
-
-PERSON'S PROFILE:
+PERSON:
 - Age: {age}
-- How friends describe them: {friends_description}
-- Favorite hobby: {hobby}
+- Friends say: {friends_description}
+- Hobby: {hobby}
 - Bad habits: {bad_habits}
-- Relationship with food: {food_relationship}
-- Schedule type: {schedule}
-- Biggest green flag: {green_flag}
-- Biggest red flag: {red_flag}
+- Food: {food_relationship}
+- Schedule: {schedule}
+- Green flag: {green_flag}
+- Red flag: {red_flag}
 - Ideal weekend: {ideal_weekend}
-- Their perfect partner must: {partner_must}
+- Partner must: {partner_must}
 
-WRITING STYLE:
-- Specific and visual. Not "messy" — "three unread pizza boxes and a cat named Debt."
-- Warm but sharp. You're roasting them with love, not cruelty.
-- The tagline should land like a punchline — one sentence that makes someone laugh out loud.
-- The compatibility_note should feel like fate — absurd but undeniable.
-- Detect the language of the person's answers and respond in that same language. If answers are in Russian — respond fully in Russian. If in English — respond in English. Give a real name that fits the character vibe and nationality.
-
-FOR THE IMAGE:
-Generate a prompt for a REALISTIC PORTRAIT PHOTO — like a candid dating app photo
-or an honest snapshot. NOT a drawing, NOT anime, NOT cartoon, NOT illustration.
-Think: slightly unflattering natural light, real person energy, the kind of photo
-where you can tell exactly who this person is in 2 seconds.
-Include: approximate age look, face details (tired eyes / rosy cheeks / smirk),
-hair, skin, expression, outfit, background. End with:
-"realistic portrait photo, 35mm lens, natural light, candid, photorealistic, no illustration"
-
-Respond ONLY with valid JSON. No markdown, no backticks, no extra text.
-
-{{
-  "name": "first name that fits the character",
-  "age": "age range — factor in lifestyle wear. Hard living adds years.",
-  "tagline": "one killer sentence. Should make the reader laugh or wince.",
-  "description": "3 sentences. Concrete details — what's on their desk, what they smell like, what they say on a first date. Make it feel like you've actually met this person.",
-  "compatibility_note": "one sentence. Why these two disasters belong together. Make it feel inevitable.",
-  "image_prompt": "realistic portrait photo description + 'realistic portrait photo, 35mm lens, natural light, candid, photorealistic, no illustration, no anime, no cartoon'"
-}}
-"""
+Return ONLY a JSON object. No markdown, no backticks, no explanation. Just the raw JSON.
+Required fields: name, age, tagline, description, compatibility_note, image_prompt.
+The "age" field must be a single specific number like "34", not a range.
+Example format:
+{{"name":"Sofia","age":"34","tagline":"One sentence punchline.","description":"Two or three sentences about them.","compatibility_note":"One sentence why they match.","image_prompt":"Physical description... photorealistic portrait photo, natural light, 35mm, no illustration"}}"""
 
         def generate_match() -> str:
             result = gl.nondet.exec_prompt(prompt)
-            result = result.replace("```json", "").replace("```", "").strip()
-            parsed = json.loads(result)
+            # Strip markdown if present
+            result = result.strip()
+            if result.startswith("```"):
+                result = re.sub(r"```[a-z]*\n?", "", result).replace("```", "").strip()
+            # Extract JSON object
+            start = result.find("{")
+            end = result.rfind("}") + 1
+            if start == -1 or end == 0:
+                raise ValueError("No JSON object found in response")
+            json_str = result[start:end]
+            parsed = json.loads(json_str)
+            # Validate required fields
+            for field in ["name", "age", "tagline", "description", "compatibility_note", "image_prompt"]:
+                if field not in parsed:
+                    raise ValueError(f"Missing field: {field}")
             return json.dumps(parsed, sort_keys=True, ensure_ascii=False)
 
         self.last_match = gl.eq_principle.prompt_comparative(
             generate_match,
-            "The outputs are equivalent if both generated soulmates reflect the same "
-            "core interpretation of the person's profile — same general character type, "
-            "similar flaw amplification, and similar wish-fulfillment twist. "
-            "Differences in name, exact wording, or minor details are fine. "
-            "JSON must be valid with all fields: name, age, tagline, description, "
-            "compatibility_note, image_prompt."
+            "The outputs are equivalent if both describe a similar character type "
+            "with the same core twist on the person's wishes and flaws. "
+            "Minor differences in name, wording, or details are acceptable. "
+            "Both must be valid JSON with all required fields."
         )
 
     @gl.public.view
