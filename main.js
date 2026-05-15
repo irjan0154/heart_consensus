@@ -456,11 +456,23 @@ function updateWalletBtn() {
     btn.textContent = walletAddress.slice(0,6) + '...' + walletAddress.slice(-4);
     btn.style.borderColor = 'rgba(232,82,122,0.4)';
     btn.style.color = '#E8527A';
+    btn.title = 'Click to disconnect';
+    btn.onclick = disconnectWallet;
   } else {
     btn.textContent = 'Connect Wallet';
     btn.style.borderColor = 'rgba(58,58,69,0.18)';
     btn.style.color = 'var(--dark, #3A3A45)';
+    btn.title = '';
+    btn.onclick = openWalletModal;
   }
+}
+
+function disconnectWallet() {
+  walletAddress = null;
+  provider = null;
+  updateWalletBtn();
+  hideNetworkBanner();
+  showToast('Wallet disconnected');
 }
 
 // ─── QUIZ ─────────────────────────────────────────────────
