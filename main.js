@@ -1,15 +1,26 @@
-// v3
-console.log("[HeartConsensus] main.js v3 loaded");
+// v4
+console.log("%c♥ HeartConsensus loaded", "color:#E8527A;font-weight:bold");
 // ─── CONFIG ───────────────────────────────────────────────
-const CONTRACT_ADDRESS = '0x3563AC42f01F295E16fdD1Bd25B26F83e6271DAd';
-const GENLAYER_RPC     = 'https://studio.genlayer.com/api';
-const CHAIN_ID              = 61999;
-const CHAIN_ID_HEX          = '0xF22F';
-const CONSENSUS_CONTRACT    = '0xb7278A61aa25c888815aFC32Ad3cC52fF24fE575';
-const NUM_VALIDATORS        = 5n;
-const MAX_ROTATIONS         = 3n;
-// addTransaction(address,address,uint256,uint256,bytes) selector
-const ADD_TX_SELECTOR       = '0x27241a99';
+const CONTRACT_ADDRESS  = '0x012186D2Fde2202720Af43a1d30C194A8d444505';
+const GENLAYER_RPC      = 'https://studio.genlayer.com/api';
+const CHAIN_ID          = 61999;
+const CHAIN_ID_HEX      = '0xF22F';
+const CONSENSUS_CONTRACT = '0xb7278A61aa25c888815aFC32Ad3cC52fF24fE575';
+const NUM_VALIDATORS    = 5n;
+const MAX_ROTATIONS     = 3n;
+const ADD_TX_SELECTOR   = '0x27241a99';
+
+const GENLAYER_NETWORK = {
+  chainId: CHAIN_ID_HEX,
+  chainName: 'GenLayer Studio Testnet',
+  nativeCurrency: { name: 'GEN', symbol: 'GEN', decimals: 18 },
+  rpcUrls: [GENLAYER_RPC],
+  blockExplorerUrls: ['https://explorer-studio.genlayer.com'],
+};
+
+// ─── STATE ────────────────────────────────────────────────
+let walletAddress = null;
+let provider = null;
 
 
 // ─── ABI Encoding for addTransaction ──────────────────────
@@ -221,7 +232,7 @@ function extractMatchFromResult(resultB64) {
   // bytes[0] = result code (0 = success/return)
   try {
     const raw = Uint8Array.from(atob(resultB64), c => c.charCodeAt(0));
-    console.log('result code:', raw[0], '| payload length:', raw.length - 1);
+    
     if (raw[0] !== 0) {
       // Not a successful return — show error payload as text
       const msg = new TextDecoder().decode(raw.slice(1));
@@ -230,7 +241,7 @@ function extractMatchFromResult(resultB64) {
     }
     const payload = raw.slice(1); // GL-encoded return value
     const str = glDecodeStr(payload);
-    console.log('decoded result string:', str);
+    
     const i = str.indexOf('{'), j = str.lastIndexOf('}');
     if (i !== -1 && j !== -1) return JSON.parse(str.slice(i, j + 1));
   } catch(e) {
@@ -252,47 +263,187 @@ const questions = [
   "What's your biggest fear in a relationship?",
   "Describe your perfect partner in one sentence"
 ];
-
-const questionsRu = [
-  "Сколько лет?",
-  "Как бы тебя описал(а) бывший/бывшая? 3 слова",
-  "Суббота, 14:00. Где ты и с кем?",
-  "Закончи фразу: время наедине с собой — это...",
-  "Если бы твоя одежда могла говорить, что бы она сказала?",
-  "За что втихаря осуждаешь людей?",
-  "Последняя импульсивная покупка?",
-  "Твой главный красный флаг? (честно)",
-  "Твой главный страх в отношениях?",
-  "Опиши идеального партнёра одним предложением"
-];
 let current = 0;
 const answers = [];
 let walletAddress = null;
 
-// ─── WALLET ───────────────────────────────────────────────
-async function connectWallet() {
-  if (!window.ethereum) { alert('MetaMask not found. Please install MetaMask extension.'); return; }
-  try {
-    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-    walletAddress = accounts[0];
-    await switchToGenLayer();
-    closeModal('walletModal');
-    updateWalletBtn();
-  } catch(e) { console.error(e); alert('Could not connect wallet: ' + (e.message || e)); }
+// ─── PROVIDER DETECTION ───────────────────────────────────
+function detectProvider() {
+  if (typeof window.okxwallet !== 'undefined') return window.okxwallet;
+  if (window.ethereum?.providers?.length) return window.ethereum.providers[0];
+  if (typeof window.ethereum !== 'undefined') return window.ethereum;
+  return null;
 }
 
-async function switchToGenLayer() {
+function waitForProvider(timeoutMs = 4000) {
+  return new Promise(resolve => {
+    const found = detectProvider();
+    if (found) { resolve(found); return; }
+    let elapsed = 0;
+    const iv = setInterval(() => {
+      const p = detectProvider();
+      if (p) { clearInterval(iv); resolve(p); return; }
+      elapsed += 100;
+      if (elapsed >= timeoutMs) { clearInterval(iv); resolve(null); }
+    }, 100);
+  });
+}
+
+// ─── NETWORK HELPERS ──────────────────────────────────────
+async function getCurrentChainId() {
+  if (!provider) return null;
   try {
-    await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: CHAIN_ID_HEX }] });
+    const hex = await provider.request({ method: 'eth_chainId' });
+    return parseInt(hex, 16);
+  } catch { return null; }
+}
+
+async function isOnCorrectNetwork() {
+  const id = await getCurrentChainId();
+  if (id !== CHAIN_ID) {
+    console.warn('[Network] Wrong chain. Got:', id, 'Need:', CHAIN_ID);
+    return false;
+  }
+  return true;
+}
+
+window.switchNetwork = async function () {
+  if (!provider) { showToast('Connect your wallet first.'); return; }
+  const btn = document.querySelector('#networkBanner button');
+  if (btn) { btn.textContent = 'Switching…'; btn.disabled = true; }
+  try {
+    await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: CHAIN_ID_HEX }] });
+  } catch (err) {
+    if (err.code === 4902 || err.message?.includes('Unrecognized chain')) {
+      try {
+        await provider.request({ method: 'wallet_addEthereumChain', params: [GENLAYER_NETWORK] });
+      } catch {
+        showToast('Add GenLayer Testnet manually in your wallet.');
+        if (btn) { btn.textContent = 'Switch'; btn.disabled = false; }
+        return;
+      }
+    } else if (err.code === 4001) {
+      showToast('Rejected. Switch the network manually.');
+      if (btn) { btn.textContent = 'Switch'; btn.disabled = false; }
+      return;
+    }
+  }
+  let attempts = 0;
+  const poll = setInterval(async () => {
+    attempts++;
+    const id = await getCurrentChainId();
+    if (id === CHAIN_ID) {
+      clearInterval(poll);
+      hideNetworkBanner();
+      showToast('✓ Switched to GenLayer Studio Testnet');
+      if (btn) { btn.textContent = 'Switch'; btn.disabled = false; }
+    } else if (attempts >= 60) {
+      clearInterval(poll);
+      showToast('Not switched. Please switch manually.');
+      if (btn) { btn.textContent = 'Switch'; btn.disabled = false; }
+    }
+  }, 500);
+};
+
+// ─── NETWORK BANNER ───────────────────────────────────────
+function showNetworkBanner() {
+  let b = document.getElementById('networkBanner');
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'networkBanner';
+    b.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:500;' +
+      'background:white;border:1px solid rgba(232,82,122,0.4);border-radius:14px;' +
+      'padding:16px 24px;text-align:center;font-family:DM Sans,sans-serif;font-size:13px;' +
+      'box-shadow:0 8px 32px rgba(232,82,122,0.15);max-width:420px;width:calc(100% - 40px);';
+    document.body.appendChild(b);
+  }
+  b.innerHTML = `
+    <div style="font-size:11px;letter-spacing:.1em;color:#E8527A;margin-bottom:6px;font-weight:600;">⚠ WRONG NETWORK</div>
+    <div style="color:#3A3A45;margin-bottom:4px;font-size:14px;font-weight:500;">
+      Switch to <strong>GenLayer Studio Testnet</strong>
+    </div>
+    <div style="color:#AAAABC;font-size:11px;margin-bottom:12px;">
+      Chain ID: <strong style="color:#E8527A;">61999</strong> &nbsp;|&nbsp;
+      RPC: <strong style="color:#E8527A;">studio.genlayer.com/api</strong>
+    </div>
+    <button onclick="window.switchNetwork()" style="
+      background:linear-gradient(135deg,#E8527A,#F07090);border:none;color:#fff;
+      font-family:DM Sans,sans-serif;font-size:13px;font-weight:500;
+      padding:8px 22px;border-radius:100px;cursor:pointer;">
+      Switch Network</button>`;
+  b.style.display = 'block';
+}
+
+function hideNetworkBanner() {
+  const b = document.getElementById('networkBanner');
+  if (b) b.style.display = 'none';
+}
+
+// ─── TOAST ────────────────────────────────────────────────
+function showToast(msg) {
+  let t = document.getElementById('hcToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'hcToast';
+    t.style.cssText = 'position:fixed;bottom:32px;left:50%;transform:translateX(-50%);z-index:600;' +
+      'background:#3A3A45;color:white;padding:10px 20px;border-radius:100px;font-size:13px;' +
+      'font-family:DM Sans,sans-serif;opacity:0;transition:opacity 0.3s;pointer-events:none;' +
+      'white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.2);';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3000);
+}
+
+// ─── WALLET ───────────────────────────────────────────────
+async function connectWallet() {
+  provider = await waitForProvider(4000);
+  if (!provider) {
+    showToast('No wallet found. Install MetaMask or Rabby.');
+    return;
+  }
+  try {
+    const accounts = await provider.request({ method: 'eth_requestAccounts' });
+    if (!accounts?.length) { showToast('No accounts found. Unlock your wallet.'); return; }
+    walletAddress = accounts[0];
+
+    if (await isOnCorrectNetwork()) {
+      hideNetworkBanner();
+    } else {
+      showNetworkBanner();
+    }
+
+    closeModal('walletModal');
+    updateWalletBtn();
+
+    // Listen for network changes
+    provider.on('chainChanged', async () => {
+      const id = await getCurrentChainId();
+      if (id === CHAIN_ID) {
+        hideNetworkBanner();
+        showToast('✓ GenLayer Studio Testnet connected');
+      } else {
+        showNetworkBanner();
+      }
+    });
+
+    // Listen for account changes
+    provider.on('accountsChanged', async (accs) => {
+      if (!accs.length) {
+        walletAddress = null;
+        updateWalletBtn();
+        showToast('Wallet disconnected');
+        return;
+      }
+      walletAddress = accs[0];
+      updateWalletBtn();
+    });
+
   } catch(e) {
-    if (e.code === 4902) {
-      await window.ethereum.request({
-        method: 'wallet_addEthereumChain',
-        params: [{ chainId: CHAIN_ID_HEX, chainName: 'GenLayer Studio',
-          nativeCurrency: { name: 'GEN', symbol: 'GEN', decimals: 18 },
-          rpcUrls: [GENLAYER_RPC], blockExplorerUrls: ['https://explorer-studio.genlayer.com'] }]
-      });
-    } else throw e;
+    if (e.code === 4001) showToast('Connection rejected.');
+    else { console.error('connectWallet error:', e); showToast('Failed to connect. Try again.'); }
   }
 }
 
@@ -315,15 +466,6 @@ function startQuiz() {
 function updateQuiz() {
   document.getElementById('quizCounter').textContent = `Question ${current + 1} of ${questions.length}`;
   document.getElementById('quizQuestion').textContent = questions[current];
-  // show Russian subtitle
-  let sub = document.getElementById('quizSubtitle');
-  if (!sub) {
-    sub = document.createElement('div');
-    sub.id = 'quizSubtitle';
-    sub.style.cssText = 'font-size:13px;color:rgba(255,255,255,0.3);margin-top:-20px;margin-bottom:28px;font-style:italic;';
-    document.getElementById('quizQuestion').insertAdjacentElement('afterend', sub);
-  }
-  sub.textContent = questionsRu[current];
   document.getElementById('quizInput').value = answers[current] || '';
   document.getElementById('quizInput').focus();
   document.getElementById('progressFill').style.width = `${((current + 1) / questions.length) * 100}%`;
@@ -356,25 +498,33 @@ async function submitToContract() {
   document.getElementById('quizScreen').classList.remove('open');
   showWaiting();
 
+  // Check network before submitting
+  if (!await isOnCorrectNetwork()) {
+    hideWaiting();
+    showNetworkBanner();
+    showToast('⚠ Wrong network! Switch to GenLayer Studio Testnet first.');
+    return;
+  }
+
   const argValues = answers.slice(0, 10);
 
   try {
     // _txData for consensus = RLP([glEncode(calldata), leaderOnly])
     const txData = buildWriteCalldata('find_soulmate', argValues);
-    console.log('txData (inner):', txData);
+    
 
     // Encode addTransaction(sender, recipient, numValidators, maxRotations, txData)
     const encodedCall = abiEncodeAddTransaction(
       walletAddress, CONTRACT_ADDRESS, NUM_VALIDATORS, MAX_ROTATIONS, txData
     );
-    console.log('addTransaction call:', encodedCall.slice(0, 80) + '...');
+    
 
-    const txHash = await window.ethereum.request({
+    const txHash = await provider.request({
       method: 'eth_sendTransaction',
       params: [{ from: walletAddress, to: CONSENSUS_CONTRACT, data: encodedCall, gas: '0x' + (500000).toString(16) }]
     });
 
-    console.log('TX sent:', txHash);
+    console.log("%c→ TX sent: " + txHash, "color:#E8527A");
     animateWaiting();
     await pollForResult(txHash);
   } catch(e) {
@@ -400,7 +550,7 @@ async function pollForResult(txHash) {
       }).then(r => r.json());
 
       // Log raw response first time to see structure
-      if (attempt === 1) console.log('RAW TX RESPONSE:', JSON.stringify(resp));
+      
 
       const tx = resp?.result;
       // Try every possible status field location
@@ -410,12 +560,12 @@ async function pollForResult(txHash) {
         ?? tx?.consensus_data?.status
         ?? tx?.data?.status;
 
-      console.log('TX status:', status, '| keys:', tx ? Object.keys(tx).join(',') : 'null', '(attempt', attempt + ')');
+      if (attempt % 5 === 1) console.log("%c⏳ Polling attempt " + attempt + " | status: " + status, "color:#aaa");
 
       const DONE = ['FINALIZED','ACCEPTED','7','5'];
       if (status !== undefined && status !== null && DONE.some(s => String(status) === s)) {
         clearInterval(interval);
-        console.log('Full TX object:', JSON.stringify(tx, null, 2));
+        console.log("%c✓ TX finalized", "color:#4AE296");
 
         // ── Strategy 1: extract result from leader_receipt in the TX itself ──
         const match = extractResultFromTx(tx);
@@ -426,7 +576,7 @@ async function pollForResult(txHash) {
         return;
       }
 
-    } catch(e) { console.log('Polling error:', e.message); }
+    } catch(e) { console.warn("Polling error:", e.message); }
 
     if (attempt >= maxAttempts) {
       clearInterval(interval);
@@ -441,11 +591,11 @@ function extractResultFromTx(tx) {
   try {
     // GenLayer puts consensus result in consensus_data.leader_receipt
     const leaderReceipt = tx?.consensus_data?.leader_receipt;
-    if (!leaderReceipt) { console.log('No leader_receipt in TX'); return null; }
+    if (!leaderReceipt) { return null; }
 
     const receipts = Array.isArray(leaderReceipt) ? leaderReceipt : [leaderReceipt];
     for (const r of receipts) {
-      console.log('leader_receipt entry:', JSON.stringify(r));
+      
       // result is base64 encoded
       if (r.result && typeof r.result === 'string') {
         const match = extractMatchFromResult(r.result);
@@ -470,7 +620,7 @@ function extractFromContractState(contractState) {
       const obj = JSON.parse(candidate);
       // Validate it has expected match fields
       if (obj.name && obj.age && obj.tagline && obj.description) {
-        console.log('Found match in contract_state:', obj.name);
+        console.log("%c♥ Match found in contract_state: " + obj.name, "color:#E8527A");
         return obj;
       }
     } catch(e) { /* not JSON, skip */ }
@@ -497,10 +647,10 @@ async function fetchResultViaGenCall(txHash, retries = 6, delayMs = 5000) {
         })
       }).then(r => r.json());
 
-      console.log('gen_call attempt', attempt, ':', JSON.stringify(resp));
+      
 
       if (resp?.error) {
-        console.warn('gen_call RPC error attempt ' + attempt + ':', resp.error?.message);
+        console.warn("gen_call error attempt " + attempt + ":", resp.error?.message);
         // Try to extract result from contract_state inside the error data
         const match = extractFromContractState(resp?.error?.data?.receipt?.contract_state);
         if (match) { hideWaiting(); showResult(match); return; }
@@ -518,7 +668,7 @@ async function fetchResultViaGenCall(txHash, retries = 6, delayMs = 5000) {
         const bytes = new Uint8Array(raw.match(/.{2}/g).map(b => parseInt(b, 16)));
         // gen_call returns raw GL-encoded value (no result-code prefix)
         const str = glDecodeStr(bytes);
-        console.log('gen_call decoded string:', str ? str.slice(0, 100) : 'null');
+        if (str) console.log("%c♥ Result decoded", "color:#E8527A");
         if (str) {
           const i = str.indexOf('{'), j = str.lastIndexOf('}');
           if (i !== -1 && j !== -1) {
@@ -589,8 +739,15 @@ function openWalletModal() { document.getElementById('walletModal').classList.ad
 function closeModal(id)    { document.getElementById(id).classList.remove('open'); }
 
 window.addEventListener('load', async () => {
-  if (window.ethereum) {
-    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-    if (accounts.length > 0) { walletAddress = accounts[0]; updateWalletBtn(); }
+  provider = detectProvider();
+  if (provider) {
+    try {
+      const accounts = await provider.request({ method: 'eth_accounts' });
+      if (accounts.length > 0) {
+        walletAddress = accounts[0];
+        updateWalletBtn();
+        if (!await isOnCorrectNetwork()) showNetworkBanner();
+      }
+    } catch(e) { console.warn('Auto-connect failed:', e.message); }
   }
 });
