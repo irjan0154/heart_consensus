@@ -265,7 +265,6 @@ const questions = [
 ];
 let current = 0;
 const answers = [];
-let walletAddress = null;
 
 // ─── PROVIDER DETECTION ───────────────────────────────────
 function detectProvider() {
