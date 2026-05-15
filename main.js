@@ -3,8 +3,46 @@ console.log("[HeartConsensus] main.js v3 loaded");
 // ─── CONFIG ───────────────────────────────────────────────
 const CONTRACT_ADDRESS = '0xe82D69b5d0C66E19DED441Eb3c8787bf14cce571';
 const GENLAYER_RPC     = 'https://studio.genlayer.com/api';
-const CHAIN_ID         = 61999;
-const CHAIN_ID_HEX     = '0xF22F';
+const CHAIN_ID              = 61999;
+const CHAIN_ID_HEX          = '0xF22F';
+const CONSENSUS_CONTRACT    = '0xb7278A61aa25c888815aFC32Ad3cC52fF24fE575';
+const NUM_VALIDATORS        = 5n;
+const MAX_ROTATIONS         = 3n;
+// addTransaction(address,address,uint256,uint256,bytes) selector
+const ADD_TX_SELECTOR       = '0x27241a99';
+
+
+// ─── ABI Encoding for addTransaction ──────────────────────
+// Minimal ABI encoder for: addTransaction(address,address,uint256,uint256,bytes)
+function abiEncodeAddTransaction(sender, recipient, numValidators, maxRotations, txDataHex) {
+  // Each slot is 32 bytes. Layout:
+  // [selector 4b][addr1 32b][addr2 32b][uint256 32b][uint256 32b][offset 32b][len 32b][data padded]
+  function pad32(hexStr) {
+    const s = hexStr.startsWith('0x') ? hexStr.slice(2) : hexStr;
+    return s.padStart(64, '0');
+  }
+  function addrSlot(addr) { return pad32(addr.toLowerCase().replace('0x', '')); }
+  function uint256Slot(n) { return pad32(BigInt(n).toString(16)); }
+
+  const txData = txDataHex.startsWith('0x') ? txDataHex.slice(2) : txDataHex;
+  const txLen = txData.length / 2;
+  // bytes param: offset = 5 * 32 = 160 = 0xa0
+  const offset = uint256Slot(160);
+  const lenSlot = uint256Slot(txLen);
+  // pad txData to multiple of 32 bytes
+  const padded = txData.padEnd(Math.ceil(txData.length / 64) * 64, '0');
+
+  const hex = ADD_TX_SELECTOR.slice(2)
+    + addrSlot(sender)
+    + addrSlot(recipient)
+    + uint256Slot(numValidators)
+    + uint256Slot(maxRotations)
+    + offset
+    + lenSlot
+    + padded;
+
+  return '0x' + hex;
+}
 
 // ─── GenLayer Calldata Encoding ───────────────────────────
 // Faithful port of genlayer-js/src/abi/calldata/encoder.ts
@@ -299,12 +337,19 @@ async function submitToContract() {
   const argValues = answers.slice(0, 10);
 
   try {
+    // _txData for consensus = RLP([glEncode(calldata), leaderOnly])
     const txData = buildWriteCalldata('find_soulmate', argValues);
-    console.log('TX calldata:', txData);
+    console.log('txData (inner):', txData);
+
+    // Encode addTransaction(sender, recipient, numValidators, maxRotations, txData)
+    const encodedCall = abiEncodeAddTransaction(
+      walletAddress, CONTRACT_ADDRESS, NUM_VALIDATORS, MAX_ROTATIONS, txData
+    );
+    console.log('addTransaction call:', encodedCall.slice(0, 80) + '...');
 
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
-      params: [{ from: walletAddress, to: CONTRACT_ADDRESS, data: txData, gas: '0x' + (300000).toString(16) }]
+      params: [{ from: walletAddress, to: CONSENSUS_CONTRACT, data: encodedCall, gas: '0x' + (500000).toString(16) }]
     });
 
     console.log('TX sent:', txHash);
