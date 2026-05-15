@@ -93,12 +93,19 @@ function toHex(bytes) {
   return '0x' + [...bytes].map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
-// Build calldata hex: RLP([glEncode({method, args}), leaderOnly])
-function buildCalldata(method, args) {
+// Build calldata for eth_sendTransaction: RLP([glEncode({method,args}), leaderOnly])
+function buildWriteCalldata(method, args) {
   const obj = { method };
   if (args && args.length > 0) obj.args = args;
   const encoded = glEncode(obj);
-  return toHex(rlpList([encoded, new Uint8Array([])])); // leaderOnly=false → empty bytes
+  return toHex(rlpList([encoded, new Uint8Array([])]));
+}
+
+// Build calldata for gen_call (read): raw GL bytes, NO RLP wrapper
+function buildReadCalldata(method, args) {
+  const obj = { method };
+  if (args && args.length > 0) obj.args = args;
+  return toHex(glEncode(obj));
 }
 
 // ─── Decode GenLayer result from transaction ───────────────
@@ -251,7 +258,7 @@ async function submitToContract() {
   const argValues = answers.slice(0, 10);
 
   try {
-    const txData = buildCalldata('find_soulmate', argValues);
+    const txData = buildWriteCalldata('find_soulmate', argValues);
     console.log('TX calldata:', txData);
 
     const txHash = await window.ethereum.request({
@@ -341,6 +348,28 @@ function extractResultFromTx(tx) {
   return null;
 }
 
+// Extract match JSON from contract_state map (values are base64-encoded)
+function extractFromContractState(contractState) {
+  if (!contractState || typeof contractState !== 'object') return null;
+  for (const [key, b64val] of Object.entries(contractState)) {
+    if (typeof b64val !== 'string') continue;
+    try {
+      const raw = atob(b64val);
+      // Look for JSON object in the decoded string
+      const i = raw.indexOf('{'), j = raw.lastIndexOf('}');
+      if (i === -1 || j === -1) continue;
+      const candidate = raw.slice(i, j + 1);
+      const obj = JSON.parse(candidate);
+      // Validate it has expected match fields
+      if (obj.name && obj.age && obj.tagline && obj.description) {
+        console.log('Found match in contract_state:', obj.name);
+        return obj;
+      }
+    } catch(e) { /* not JSON, skip */ }
+  }
+  return null;
+}
+
 async function fetchResultViaGenCall(txHash, retries = 6, delayMs = 5000) {
   await new Promise(r => setTimeout(r, delayMs));
 
@@ -354,7 +383,7 @@ async function fetchResultViaGenCall(txHash, retries = 6, delayMs = 5000) {
             type: 'read',
             to: CONTRACT_ADDRESS,
             from: walletAddress,
-            data: buildCalldata('get_last_match', []),
+            data: buildReadCalldata('get_last_match', []),
             transaction_hash_variant: 'latest-nonfinal'
           }]
         })
@@ -363,18 +392,20 @@ async function fetchResultViaGenCall(txHash, retries = 6, delayMs = 5000) {
       console.log('gen_call attempt', attempt, ':', JSON.stringify(resp));
 
       if (resp?.error) {
-        console.warn('gen_call RPC error:', resp.error);
+        console.warn('gen_call RPC error attempt ' + attempt + ':', resp.error?.message);
+        // Try to extract result from contract_state inside the error data
+        const match = extractFromContractState(resp?.error?.data?.receipt?.contract_state);
+        if (match) { hideWaiting(); showResult(match); return; }
         if (attempt < retries) { await new Promise(r => setTimeout(r, 4000)); continue; }
         throw new Error('gen_call error: ' + (resp.error.message || JSON.stringify(resp.error)));
       }
 
-      // result is a hex string; first byte after 0x = result code
+      // result is a hex string; first byte = result code (0 = success)
       let hexOrObj = resp?.result;
       let hexStr = typeof hexOrObj === 'string' ? hexOrObj
         : (hexOrObj?.data ? hexOrObj.data : null);
 
       if (hexStr) {
-        // Convert hex → bytes → base64 for reuse of extractMatchFromResult
         const raw = hexStr.startsWith('0x') ? hexStr.slice(2) : hexStr;
         const bytes = new Uint8Array(raw.match(/.{2}/g).map(b => parseInt(b, 16)));
         const b64 = btoa(String.fromCharCode(...bytes));
