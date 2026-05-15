@@ -5,36 +5,72 @@ const CHAIN_ID         = 61999;
 const CHAIN_ID_HEX     = '0xF22F';
 
 // ─── GenLayer encoding helpers ────────────────────────────
-// Encodes method call into GenLayer calldata hex
-// Format mirrors what GenLayer Studio sends (msgpack-inspired)
-function encodeGLCall(method, args) {
-  // Build a simple length-prefixed binary format:
-  // [1 byte: num_args][2 bytes: method_len][method_bytes][for each arg: 2 bytes len + bytes]
-  const enc = new TextEncoder();
-  const methodBytes = enc.encode(method);
-  const argBufs = args.map(a => enc.encode(String(a)));
+// Minimal msgpack encoder (GenLayer uses msgpack for calldata)
+function msgpackEncode(value) {
+  const bytes = [];
 
-  let totalLen = 1 + 2 + methodBytes.length;
-  for (const b of argBufs) totalLen += 2 + b.length;
+  function writeBytes(arr) { for (const b of arr) bytes.push(b); }
 
-  const buf = new Uint8Array(totalLen);
-  let off = 0;
-
-  buf[off++] = args.length; // num args
-
-  // method name
-  buf[off++] = (methodBytes.length >> 8) & 0xff;
-  buf[off++] = methodBytes.length & 0xff;
-  buf.set(methodBytes, off); off += methodBytes.length;
-
-  // each arg
-  for (const b of argBufs) {
-    buf[off++] = (b.length >> 8) & 0xff;
-    buf[off++] = b.length & 0xff;
-    buf.set(b, off); off += b.length;
+  function encode(val) {
+    if (val === null || val === undefined) {
+      bytes.push(0xc0); // nil
+    } else if (typeof val === 'boolean') {
+      bytes.push(val ? 0xc3 : 0xc2);
+    } else if (typeof val === 'number' && Number.isInteger(val)) {
+      if (val >= 0 && val <= 0x7f) {
+        bytes.push(val);
+      } else if (val >= -32 && val < 0) {
+        bytes.push(0xe0 | (val + 32));
+      } else if (val >= 0 && val <= 0xff) {
+        bytes.push(0xcc, val);
+      } else if (val >= 0 && val <= 0xffff) {
+        bytes.push(0xcd, (val >> 8) & 0xff, val & 0xff);
+      } else {
+        bytes.push(0xce,
+          (val >>> 24) & 0xff, (val >>> 16) & 0xff,
+          (val >>> 8) & 0xff, val & 0xff);
+      }
+    } else if (typeof val === 'string') {
+      const enc = new TextEncoder().encode(val);
+      const len = enc.length;
+      if (len <= 31) {
+        bytes.push(0xa0 | len);
+      } else if (len <= 0xff) {
+        bytes.push(0xd9, len);
+      } else if (len <= 0xffff) {
+        bytes.push(0xda, (len >> 8) & 0xff, len & 0xff);
+      } else {
+        bytes.push(0xdb,
+          (len >>> 24) & 0xff, (len >>> 16) & 0xff,
+          (len >>> 8) & 0xff, len & 0xff);
+      }
+      writeBytes(enc);
+    } else if (Array.isArray(val)) {
+      const len = val.length;
+      if (len <= 15) bytes.push(0x90 | len);
+      else if (len <= 0xffff) bytes.push(0xdc, (len >> 8) & 0xff, len & 0xff);
+      else bytes.push(0xdd, (len >>> 24) & 0xff, (len >>> 16) & 0xff, (len >>> 8) & 0xff, len & 0xff);
+      for (const item of val) encode(item);
+    } else if (typeof val === 'object') {
+      const keys = Object.keys(val);
+      const len = keys.length;
+      if (len <= 15) bytes.push(0x80 | len);
+      else if (len <= 0xffff) bytes.push(0xde, (len >> 8) & 0xff, len & 0xff);
+      else bytes.push(0xdf, (len >>> 24) & 0xff, (len >>> 16) & 0xff, (len >>> 8) & 0xff, len & 0xff);
+      for (const k of keys) { encode(k); encode(val[k]); }
+    }
   }
 
-  return '0x' + Array.from(buf).map(b => b.toString(16).padStart(2,'0')).join('');
+  encode(value);
+  return new Uint8Array(bytes);
+}
+
+// Encodes a GenLayer contract method call into calldata hex (msgpack format)
+function encodeGLCall(method, args) {
+  // GenLayer calldata: msgpack array [method_name, ...args]
+  const payload = [method, ...args];
+  const encoded = msgpackEncode(payload);
+  return '0x' + Array.from(encoded).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 function decodeGLResult(hexStr) {
@@ -245,40 +281,69 @@ async function pollForResult(txHash) {
   }, 3000);
 }
 
-async function fetchResult() {
-  try {
-    const resp = await fetch(GENLAYER_RPC, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0', id: 1,
-        method: 'gen_call',
-        params: [{
-          from: walletAddress,
-          to: CONTRACT_ADDRESS,
-          data: encodeGLCall('get_last_match', []),
-          type: 'read',
-          value: '0x0'
-        }]
-      })
-    }).then(r => r.json());
+async function fetchResult(retries = 5, delayMs = 3000) {
+  // Small delay to let the node finalize state after consensus
+  await new Promise(r => setTimeout(r, delayMs));
 
-    console.log('gen_call response:', resp);
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const resp = await fetch(GENLAYER_RPC, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0', id: 1,
+          method: 'gen_call',
+          params: [{
+            from: walletAddress,
+            to: CONTRACT_ADDRESS,
+            data: encodeGLCall('get_last_match', []),
+            type: 'read',
+            value: '0x0'
+          }]
+        })
+      }).then(r => r.json());
 
-    // result.data contains the hex-encoded return value
-    const hexData = resp?.result?.data || resp?.result || '';
-    const match = decodeGLResult(hexData);
+      console.log('gen_call response (attempt ' + attempt + '):', resp);
 
-    if (!match) throw new Error('Could not parse result: ' + JSON.stringify(resp));
+      // If RPC returned an error object, log and retry
+      if (resp?.error) {
+        console.warn('RPC error:', resp.error);
+        if (attempt < retries) {
+          await new Promise(r => setTimeout(r, 3000));
+          continue;
+        }
+        throw new Error('RPC error: ' + (resp.error.message || JSON.stringify(resp.error)));
+      }
 
-    hideWaiting();
-    showResult(match);
+      // result can be hex string directly, or an object with .data
+      const hexData = resp?.result?.data ?? resp?.result ?? '';
+      console.log('hexData:', hexData);
 
-  } catch(e) {
-    console.error('fetchResult error:', e);
-    hideWaiting();
-    alert('Could not fetch result: ' + e.message);
-    goHome();
+      const match = decodeGLResult(hexData);
+
+      if (!match) {
+        if (attempt < retries) {
+          console.warn('Could not parse result, retrying...', hexData);
+          await new Promise(r => setTimeout(r, 3000));
+          continue;
+        }
+        throw new Error('Could not parse result: ' + JSON.stringify(resp));
+      }
+
+      hideWaiting();
+      showResult(match);
+      return;
+
+    } catch(e) {
+      console.error('fetchResult error (attempt ' + attempt + '):', e);
+      if (attempt >= retries) {
+        hideWaiting();
+        alert('Could not fetch result: ' + e.message);
+        goHome();
+      } else {
+        await new Promise(r => setTimeout(r, 3000));
+      }
+    }
   }
 }
 
