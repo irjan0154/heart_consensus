@@ -114,26 +114,67 @@ function buildReadCalldata(method, args) {
 // For code=0: remaining bytes are GL-encoded return value
 // For a string return type: GL_STR encoded bytes → raw string
 
+// Read LEB128-encoded varint from bytes at index i, return {value, i}
+function readLEB128(bytes, i) {
+  let val = 0n, shift = 0n;
+  while (true) {
+    const b = bytes[i++];
+    val += BigInt(b & 0x7f) << shift;
+    shift += 7n;
+    if ((b & 0x80) === 0) break;
+  }
+  return { val, i };
+}
+
+// Decode a GL-encoded value and return the raw JS value
+function glDecodeAny(bytes, i = 0) {
+  const { val: tag, i: next } = readLEB128(bytes, i);
+  const type = Number(tag & 7n);
+  const data = tag >> 3n;
+  const len  = Number(data);
+  switch (type) {
+    case 0: { // SPECIAL: null=0, false=8>>3=1, true=16>>3=2
+      const s = Number(data);
+      return { val: s === 0 ? null : s === 1 ? false : true, i: next };
+    }
+    case 1: return { val: Number(data), i: next };   // PINT
+    case 2: return { val: -Number(data) - 1, i: next }; // NINT
+    case 3: { // BYTES
+      return { val: bytes.slice(next, next + len), i: next + len };
+    }
+    case 4: { // STR
+      const str = new TextDecoder().decode(bytes.slice(next, next + len));
+      return { val: str, i: next + len };
+    }
+    case 5: { // ARR
+      let pos = next; const arr = [];
+      for (let k = 0; k < len; k++) {
+        const r = glDecodeAny(bytes, pos); arr.push(r.val); pos = r.i;
+      }
+      return { val: arr, i: pos };
+    }
+    case 6: { // MAP
+      let pos = next; const map = {};
+      for (let k = 0; k < len; k++) {
+        // key: raw LEB128 length then bytes (no type tag)
+        const { val: klen, i: ki } = readLEB128(bytes, pos);
+        const key = new TextDecoder().decode(bytes.slice(ki, ki + Number(klen)));
+        pos = ki + Number(klen);
+        const r = glDecodeAny(bytes, pos); map[key] = r.val; pos = r.i;
+      }
+      return { val: map, i: pos };
+    }
+    default: return { val: null, i: next };
+  }
+}
+
 function glDecodeStr(bytes) {
-  // Try GL custom format first: read tag, then string bytes
   try {
-    let i = 0;
-    // Read LEB128 tag
-    let tag = 0n, shift = 0n;
-    while (true) {
-      const b = bytes[i++];
-      tag += BigInt(b & 0x7f) << shift;
-      shift += 7n;
-      if ((b & 0x80) === 0) break;
-    }
-    const type = Number(tag & 7n);
-    const len  = Number(tag >> 3n);
-    if (type === GL_STR) {
-      return new TextDecoder().decode(bytes.slice(i, i + len));
-    }
-    // maybe it's raw string without type tag (shouldn't happen but try)
-  } catch(e) {}
-  // Fallback: treat all bytes as UTF-8 string
+    const { val } = glDecodeAny(bytes, 0);
+    if (typeof val === 'string') return val;
+    if (val && typeof val === 'object' && !Array.isArray(val)) return JSON.stringify(val);
+  } catch(e) { console.warn('glDecodeAny failed:', e); }
+  // Fallback: raw UTF-8
   return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
 }
 
@@ -408,9 +449,18 @@ async function fetchResultViaGenCall(txHash, retries = 6, delayMs = 5000) {
       if (hexStr) {
         const raw = hexStr.startsWith('0x') ? hexStr.slice(2) : hexStr;
         const bytes = new Uint8Array(raw.match(/.{2}/g).map(b => parseInt(b, 16)));
-        const b64 = btoa(String.fromCharCode(...bytes));
-        const match = extractMatchFromResult(b64);
-        if (match) { hideWaiting(); showResult(match); return; }
+        // gen_call returns raw GL-encoded value (no result-code prefix)
+        const str = glDecodeStr(bytes);
+        console.log('gen_call decoded string:', str ? str.slice(0, 100) : 'null');
+        if (str) {
+          const i = str.indexOf('{'), j = str.lastIndexOf('}');
+          if (i !== -1 && j !== -1) {
+            try {
+              const match = JSON.parse(str.slice(i, j + 1));
+              if (match && match.name) { hideWaiting(); showResult(match); return; }
+            } catch(e) { console.warn('JSON parse failed:', e); }
+          }
+        }
       }
 
       if (attempt < retries) { await new Promise(r => setTimeout(r, 4000)); }
