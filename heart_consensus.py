@@ -2,7 +2,6 @@
 
 from genlayer import *
 import json
-import re
 
 
 class HeartConsensus(gl.Contract):
@@ -62,7 +61,7 @@ Example format:
             # Strip markdown if present
             result = result.strip()
             if result.startswith("```"):
-                result = re.sub(r"```[a-z]*\n?", "", result).replace("```", "").strip()
+                result = result.replace("```json", "").replace("```", "").strip()
             # Extract JSON object
             start = result.find("{")
             end = result.rfind("}") + 1
