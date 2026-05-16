@@ -1,7 +1,7 @@
 // v4
 console.log("%c♥ HeartConsensus loaded", "color:#E8527A;font-weight:bold");
 // ─── CONFIG ───────────────────────────────────────────────
-const CONTRACT_ADDRESS  = '0xF8bd2f37dca812DA030FE4d321bed53aDe356f7A';
+const CONTRACT_ADDRESS  = '0xECAC5f8D20d01983754f73624ef79BE57ED90705';
 const GENLAYER_RPC      = 'https://studio.genlayer.com/api';
 const CHAIN_ID          = 61999;
 const CHAIN_ID_HEX      = '0xF22F';
@@ -600,8 +600,7 @@ async function pollForResult(txHash) {
     if (attempt >= maxAttempts) {
       clearInterval(interval);
       hideWaiting();
-      alert('Transaction is taking too long. Please check GenLayer Studio and try again.');
-      goHome();
+      showConsensusFailScreen();
     }
   }, 3000);
 }
@@ -710,6 +709,49 @@ async function fetchResultViaGenCall(txHash, retries = 6, delayMs = 5000) {
   }
 }
 
+// ─── CONSENSUS FAIL SCREEN ───────────────────────────────
+function showConsensusFailScreen() {
+  // Remove existing fail screen if any
+  const existing = document.getElementById('failScreen');
+  if (existing) existing.remove();
+
+  const el = document.createElement('div');
+  el.id = 'failScreen';
+  el.style.cssText = [
+    'position:fixed','inset:0','z-index:1000',
+    'background:#fff','display:flex','flex-direction:column',
+    'align-items:center','justify-content:center',
+    'gap:20px','padding:40px','text-align:center'
+  ].join(';');
+
+  el.innerHTML = `
+    <div style="font-size:48px">💔</div>
+    <h2 style="font-family:'DM Sans',sans-serif;font-size:22px;color:#1a1a2e;margin:0;">
+      Consensus failed.
+    </h2>
+    <p style="font-family:'DM Sans',sans-serif;font-size:15px;color:#666;max-width:320px;line-height:1.6;margin:0;">
+      The validators reviewed your answers and simply gave up.
+    </p>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+      <button onclick="document.getElementById('failScreen').remove(); startQuiz();"
+        style="padding:14px 32px;background:linear-gradient(135deg,#E8527A,#ff6b9d);
+        color:#fff;border:none;border-radius:100px;font-size:15px;
+        font-family:'DM Sans',sans-serif;cursor:pointer;font-weight:500;">
+        Try Again
+      </button>
+      <button onclick="document.getElementById('failScreen').remove(); goHome();"
+        style="padding:10px 24px;background:none;border:1px solid rgba(58,58,69,0.2);
+        border-radius:100px;font-size:14px;font-family:'DM Sans',sans-serif;
+        color:#666;cursor:pointer;">
+        Back to Home
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(el);
+  document.body.style.overflow = 'hidden';
+}
+
 // ─── WAITING SCREEN ───────────────────────────────────────
 const waitingMessages = [
   "Submitting your profile to the blockchain...",
@@ -759,12 +801,21 @@ function loadMatchImage(match) {
   img.style.filter = 'blur(4px)';
   img.src = '';
 
-  // Truncate image_prompt to max 800 chars to avoid URL limit issues
+  // Build image prompt — always in English for Pollinations
   let prompt = match.image_prompt || '';
-  if (!prompt) {
-    prompt = match.name + ', realistic portrait photo, natural light, candid, photorealistic';
+
+  // If prompt contains Cyrillic — it's in Russian, Pollinations handles English better
+  // Replace with a solid English fallback built from other fields
+  const hasCyrillic = /[а-яёА-ЯЁ]/.test(prompt);
+  if (!prompt || hasCyrillic) {
+    // Build English prompt from name + tagline keywords
+    const name = match.name || 'person';
+    const tagline = (match.tagline || '').replace(/[а-яёА-ЯЁ]/g, '').trim();
+    const desc = (match.description || '').replace(/[а-яёА-ЯЁ]/g, '').trim();
+    prompt = `${name}, ${tagline} ${desc}, realistic portrait photo, natural light, 35mm, candid, photorealistic, no illustration`.trim();
   }
-  // Keep only up to 800 chars, cut at last space to avoid broken words
+
+  // Truncate to max 800 chars
   if (prompt.length > 800) {
     prompt = prompt.slice(0, 800);
     const lastSpace = prompt.lastIndexOf(' ');
