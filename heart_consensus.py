@@ -47,6 +47,7 @@ RULES:
    - Workaholic → suit at midnight, laptop open, coffee cups stacked, dead eyes
    The photo should make someone laugh the moment they see it. One look = instantly understand the character.
    End the prompt with: "photorealistic portrait photo, natural light, 35mm, candid, no illustration, no anime"
+   IMPORTANT: the image_prompt field must ALWAYS be written in English regardless of the language of other fields.
 
 PERSON:
 - Age: {age}
