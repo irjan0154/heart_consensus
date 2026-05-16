@@ -1,7 +1,7 @@
 // v4
 console.log("%c♥ HeartConsensus loaded", "color:#E8527A;font-weight:bold");
 // ─── CONFIG ───────────────────────────────────────────────
-const CONTRACT_ADDRESS  = '0xECAC5f8D20d01983754f73624ef79BE57ED90705';
+const CONTRACT_ADDRESS  = '0x4cCE0E59603fF60D75b5c7Dac0e4Ae3C0c7a627F';
 const GENLAYER_RPC      = 'https://studio.genlayer.com/api';
 const CHAIN_ID          = 61999;
 const CHAIN_ID_HEX      = '0xF22F';
@@ -664,11 +664,9 @@ async function fetchResultViaGenCall(txHash, retries = 6, delayMs = 5000) {
         body: JSON.stringify({
           jsonrpc: '2.0', id: 1, method: 'gen_call',
           params: [{
-            type: 'read',
             to: CONTRACT_ADDRESS,
             from: walletAddress,
-            data: buildReadCalldata('get_last_match', []),
-            transaction_hash_variant: 'latest-nonfinal'
+            data: buildReadCalldata('get_last_match', [])
           }]
         })
       }).then(r => r.json());
