@@ -36,7 +36,17 @@ RULES:
    - Lazy → legendary lazy. Drinks → loyalty card at the bar. Games → 4000 hours, no daylight.
 3. Be specific and visual. Not "messy" — "three pizza boxes and a cat named Debt."
 4. Detect the language of the answers and respond in that same language.
-5. The image_prompt must describe a REALISTIC PHOTO PORTRAIT. Not anime, not illustration. Like a candid dating app photo. End it with: "photorealistic portrait photo, natural light, 35mm, no illustration"
+5. The image_prompt must describe a REALISTIC PHOTO PORTRAIT — like a candid photo, NOT anime, NOT illustration.
+   MOST IMPORTANT: identify the single most extreme trait of this character (drinking, eating, gaming, fitness, cleaning obsession, etc.)
+   and push it to visual absurdity in the photo. Examples:
+   - Drinker → red puffy face, glassy eyes, holding a bottle, bar background at noon, disheveled
+   - Overeater → visibly overweight, food stains on shirt, fast food wrappers visible, crumbs on chin
+   - Gamer → pale skin, dark circles, unwashed hair, gaming setup glow, energy drink cans everywhere
+   - Fitness obsessed → overly muscular, protein shaker in hand, gym mirror selfie, veins visible
+   - Clean freak → rubber gloves still on, bleach smell implied, immaculate but tense expression
+   - Workaholic → suit at midnight, laptop open, coffee cups stacked, dead eyes
+   The photo should make someone laugh the moment they see it. One look = instantly understand the character.
+   End the prompt with: "photorealistic portrait photo, natural light, 35mm, candid, no illustration, no anime"
 
 PERSON:
 - Age: {age}
