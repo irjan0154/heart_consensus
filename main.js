@@ -752,6 +752,13 @@ function showTooYoungScreen() {
 }
 
 // ─── CONSENSUS FAIL SCREEN ───────────────────────────────
+function resetAndRetry() {
+  // Reset quiz state and start fresh
+  current = 0;
+  answers.length = 0;
+  startQuiz();
+}
+
 function showConsensusFailScreen() {
   // Remove existing fail screen if any
   const existing = document.getElementById('failScreen');
@@ -775,7 +782,7 @@ function showConsensusFailScreen() {
       The validators reviewed your answers and simply gave up.
     </p>
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
-      <button onclick="document.getElementById('failScreen').remove(); startQuiz();"
+      <button onclick="document.getElementById('failScreen').remove(); resetAndRetry();"
         style="padding:14px 32px;background:linear-gradient(135deg,#E8527A,#ff6b9d);
         color:#fff;border:none;border-radius:100px;font-size:15px;
         font-family:'DM Sans',sans-serif;cursor:pointer;font-weight:500;">
