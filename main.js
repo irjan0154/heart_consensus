@@ -502,7 +502,15 @@ function quizNext() {
   }
   answers[current] = val;
   if (current < questions.length - 1) { current++; updateQuiz(); }
-  else submitToContract();
+  else {
+    // Age check — first answer is age
+    const age = parseInt(answers[0]);
+    if (!isNaN(age) && age < 18) {
+      showTooYoungScreen();
+      return;
+    }
+    submitToContract();
+  }
 }
 function quizBack() { if (current > 0) { current--; updateQuiz(); } }
 function goHome() {
@@ -709,6 +717,40 @@ async function fetchResultViaGenCall(txHash, retries = 6, delayMs = 5000) {
   }
 }
 
+// ─── TOO YOUNG SCREEN ────────────────────────────────────
+function showTooYoungScreen() {
+  document.getElementById('quizScreen').classList.remove('open');
+
+  const el = document.createElement('div');
+  el.id = 'tooYoungScreen';
+  el.style.cssText = [
+    'position:fixed','inset:0','z-index:1000',
+    'background:#fff','display:flex','flex-direction:column',
+    'align-items:center','justify-content:center',
+    'gap:20px','padding:40px','text-align:center'
+  ].join(';');
+
+  el.innerHTML = `
+    <div style="font-size:52px">🚫</div>
+    <h2 style="font-family:'DM Sans',sans-serif;font-size:22px;color:#1a1a2e;margin:0;line-height:1.4;">
+      The validators saw your age<br>and collectively said: no.
+    </h2>
+    <p style="font-family:'DM Sans',sans-serif;font-size:15px;color:#888;max-width:300px;line-height:1.6;margin:0;">
+      Grow up and come back.
+    </p>
+    <button onclick="document.getElementById('tooYoungScreen').remove(); goHome();"
+      style="margin-top:8px;padding:14px 32px;
+      background:linear-gradient(135deg,#E8527A,#ff6b9d);
+      color:#fff;border:none;border-radius:100px;font-size:15px;
+      font-family:'DM Sans',sans-serif;cursor:pointer;font-weight:500;">
+      Back to Home
+    </button>
+  `;
+
+  document.body.appendChild(el);
+  document.body.style.overflow = 'hidden';
+}
+
 // ─── CONSENSUS FAIL SCREEN ───────────────────────────────
 function showConsensusFailScreen() {
   // Remove existing fail screen if any
@@ -803,24 +845,27 @@ function loadMatchImage(match) {
 
   // Build image prompt — always in English for Pollinations
   let prompt = match.image_prompt || '';
+  const age = match.age || '';
+  const name = match.name || 'person';
 
-  // If prompt contains Cyrillic — it's in Russian, Pollinations handles English better
-  // Replace with a solid English fallback built from other fields
-  const hasCyrillic = /[а-яёА-ЯЁ]/.test(prompt);
-  if (!prompt || hasCyrillic) {
-    // Build English prompt from name + tagline keywords
-    const name = match.name || 'person';
-    const tagline = (match.tagline || '').replace(/[а-яёА-ЯЁ]/g, '').trim();
-    const desc = (match.description || '').replace(/[а-яёА-ЯЁ]/g, '').trim();
-    prompt = `${name}, ${tagline} ${desc}, realistic portrait photo, natural light, 35mm, candid, photorealistic, no illustration`.trim();
+  // Check if prompt has too much Cyrillic (Russian) — Pollinations needs English
+  const cyrillicCount = (prompt.match(/[а-яёА-ЯЁ]/g) || []).length;
+  const totalCount = prompt.replace(/\s/g, '').length || 1;
+  const isMostlyRussian = cyrillicCount / totalCount > 0.3;
+
+  if (!prompt || isMostlyRussian) {
+    // Build a solid English prompt from structured data
+    prompt = `${name}, ${age} years old, realistic candid portrait photo, natural light, 35mm lens, photorealistic, no illustration, no anime, no cartoon`;
   }
 
-  // Truncate to max 800 chars
-  if (prompt.length > 800) {
-    prompt = prompt.slice(0, 800);
+  // Truncate to max 600 chars (safer limit)
+  if (prompt.length > 600) {
+    prompt = prompt.slice(0, 600);
     const lastSpace = prompt.lastIndexOf(' ');
-    if (lastSpace > 600) prompt = prompt.slice(0, lastSpace);
+    if (lastSpace > 400) prompt = prompt.slice(0, lastSpace);
   }
+
+  console.log('Final image prompt:', prompt);
 
   const encoded = encodeURIComponent(prompt);
   const seed = Math.floor(Math.random() * 99999); // random seed = fresh image each time
@@ -828,25 +873,45 @@ function loadMatchImage(match) {
 
   console.log('Image URL length:', url.length);
 
-  const tempImg = new Image();
-  tempImg.onload = () => {
-    img.src = url;
+  function applyImage(src) {
+    img.src = src;
     img.style.opacity = '1';
     img.style.filter = 'none';
     img.style.transition = 'opacity 0.5s, filter 0.5s';
     img.style.cursor = 'zoom-in';
-    img.onclick = () => openLightbox(url);
-  };
-  tempImg.onerror = () => {
-    // Fallback: try with shorter prompt
-    const fallback = encodeURIComponent(
-      match.name + ', realistic photo portrait, natural lighting, candid, photorealistic'
-    );
-    img.src = `https://image.pollinations.ai/prompt/${fallback}?width=512&height=512&nologo=true&seed=${seed}`;
-    img.style.opacity = '1';
-    img.style.filter = 'none';
-  };
-  tempImg.src = url;
+    img.onclick = () => openLightbox(src);
+  }
+
+  function tryLoad(src, attempt) {
+    const t = new Image();
+    // Pollinations can be slow — give it 30 seconds
+    const timeout = setTimeout(() => {
+      t.src = '';
+      if (attempt < 3) {
+        console.log('Image timeout, retry attempt', attempt + 1);
+        const retrySeed = Math.floor(Math.random() * 99999);
+        tryLoad(src.replace(/seed=\d+/, 'seed=' + retrySeed), attempt + 1);
+      } else {
+        // Final fallback — minimal prompt
+        const fb = encodeURIComponent(name + ', ' + age + ' years old, portrait photo, natural light, photorealistic');
+        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux`);
+      }
+    }, 30000);
+    t.onload = () => { clearTimeout(timeout); applyImage(src); };
+    t.onerror = () => {
+      clearTimeout(timeout);
+      if (attempt < 3) {
+        const retrySeed = Math.floor(Math.random() * 99999);
+        tryLoad(src.replace(/seed=\d+/, 'seed=' + retrySeed), attempt + 1);
+      } else {
+        const fb = encodeURIComponent(name + ', ' + age + ' years old, portrait photo, natural light, photorealistic');
+        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux`);
+      }
+    };
+    t.src = src;
+  }
+
+  tryLoad(url, 1);
 }
 
 // ─── LIGHTBOX ─────────────────────────────────────────────
