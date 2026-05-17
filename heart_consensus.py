@@ -25,54 +25,59 @@ class HeartConsensus(gl.Contract):
         partner_must: str,
     ) -> None:
 
-        prompt = (
-            "You are a funny matchmaking AI. Analyze this person and generate their perfect (wrong) match.\n\n"
-            "RULES:\n"
-            "1. Give them what they want (green_flag, partner_must) but in the most inconvenient version.\n"
-            "2. Mirror their worst habit (red_flag, bad_habits) but one level worse.\n"
-            "3. Be specific and visual. Not 'messy' but 'three pizza boxes and a cat named Debt'.\n"
-            "4. Detect the language of the answers and respond in that same language - EXCEPT the image_prompt field which must ALWAYS be in English.\n"
-            "5. image_prompt: realistic portrait photo, identify the most extreme trait and exaggerate it visually to absurdity. End with: 'photorealistic portrait photo, natural light, 35mm, candid, no illustration, no anime'\n\n"
-            "PERSON:\n"
-            f"- Age: {age}\n"
-            f"- Friends say: {friends_description}\n"
-            f"- Hobby: {hobby}\n"
-            f"- Bad habits: {bad_habits}\n"
-            f"- Food: {food_relationship}\n"
-            f"- Schedule: {schedule}\n"
-            f"- Green flag: {green_flag}\n"
-            f"- Red flag: {red_flag}\n"
-            f"- Ideal weekend: {ideal_weekend}\n"
-            f"- Partner must: {partner_must}\n\n"
-            "Return ONLY a JSON object on a single line. No markdown, no backticks, no newlines inside strings.\n"
-            "Required fields: name, age, tagline, description, compatibility_note, image_prompt.\n"
-            "The age field must be a single number like 34.\n"
-            'Example: {"name":"Sofia","age":"34","tagline":"One sentence.","description":"Two sentences.","compatibility_note":"One sentence.","image_prompt":"English description... photorealistic portrait photo, natural light, 35mm, candid, no illustration, no anime"}'
+        person = (
+            f"Age: {age}. "
+            f"Friends say: {friends_description}. "
+            f"Hobby: {hobby}. "
+            f"Bad habits: {bad_habits}. "
+            f"Food: {food_relationship}. "
+            f"Schedule: {schedule}. "
+            f"Green flag: {green_flag}. "
+            f"Red flag: {red_flag}. "
+            f"Weekend: {ideal_weekend}. "
+            f"Partner must: {partner_must}."
         )
 
+        prompt = f"""You are a brutally funny matchmaking AI. Generate a soulmate character for this person.
+
+RULES:
+- Give them what they want (green_flag, partner_must) in the most inconvenient real version
+- Mirror their worst trait (red_flag, bad_habits) but worse
+- Be specific and funny
+- Respond in the same language as the person's answers
+- The image_prompt field must always be in English
+
+PERSON: {person}
+
+Respond with ONLY a JSON object. No markdown. No explanation. No newlines inside string values.
+Use this exact structure:
+{{"name":"NAME","age":"NUMBER","tagline":"FUNNY ONE LINER","description":"2-3 FUNNY SENTENCES","compatibility_note":"ONE SENTENCE","image_prompt":"ENGLISH PHOTO DESCRIPTION photorealistic portrait photo natural light 35mm candid no illustration no anime"}}"""
+
         def generate_match() -> str:
-            result = gl.nondet.exec_prompt(prompt)
-            result = result.strip()
-            # Strip markdown
-            if "```" in result:
-                result = result.replace("```json", "").replace("```", "").strip()
-            # Extract JSON
-            start = result.find("{")
-            end = result.rfind("}") + 1
-            if start == -1 or end == 0:
-                raise ValueError("No JSON in response")
-            parsed = json.loads(result[start:end])
-            # Validate fields
-            for field in ["name", "age", "tagline", "description", "compatibility_note", "image_prompt"]:
-                if field not in parsed:
-                    raise ValueError("Missing: " + field)
-            return json.dumps(parsed, sort_keys=True, ensure_ascii=False)
+            raw = gl.nondet.exec_prompt(prompt).strip()
+            # Remove markdown if present
+            if raw.startswith("```"):
+                lines = [l for l in raw.split("\n") if not l.strip().startswith("```")]
+                raw = "\n".join(lines).strip()
+            # Find JSON boundaries
+            start = raw.find("{")
+            end = raw.rfind("}") + 1
+            if start < 0 or end <= 0:
+                raise ValueError("No JSON found")
+            obj = json.loads(raw[start:end])
+            # Ensure all fields present
+            for f in ["name", "age", "tagline", "description", "compatibility_note", "image_prompt"]:
+                if f not in obj:
+                    raise ValueError("Missing field: " + f)
+            # Return compact single-line JSON
+            return json.dumps(obj, ensure_ascii=False, separators=(',', ':'))
 
         self.last_match = gl.eq_principle.prompt_comparative(
             generate_match,
-            "Equivalent if both describe a similar character with same core twist. "
-            "Minor differences in name or wording are fine. "
-            "JSON must be valid with all required fields."
+            "The outputs are equivalent if both generated soulmates reflect the same "
+            "character type with similar humor and traits. "
+            "Differences in name, exact wording, or minor details are acceptable. "
+            "Both must be valid JSON with all 6 required fields."
         )
 
     @gl.public.view
