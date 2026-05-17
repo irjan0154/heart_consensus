@@ -26,52 +26,77 @@ class HeartConsensus(gl.Contract):
     ) -> None:
 
         person = (
-            f"Age: {age}. "
-            f"Friends say: {friends_description}. "
-            f"Hobby: {hobby}. "
-            f"Bad habits: {bad_habits}. "
-            f"Food: {food_relationship}. "
-            f"Schedule: {schedule}. "
-            f"Green flag: {green_flag}. "
-            f"Red flag: {red_flag}. "
-            f"Weekend: {ideal_weekend}. "
-            f"Partner must: {partner_must}."
+            "Age: " + age + ". "
+            "Friends say: " + friends_description + ". "
+            "Hobby: " + hobby + ". "
+            "Bad habits: " + bad_habits + ". "
+            "Food: " + food_relationship + ". "
+            "Schedule: " + schedule + ". "
+            "Green flag: " + green_flag + ". "
+            "Red flag: " + red_flag + ". "
+            "Weekend: " + ideal_weekend + ". "
+            "Partner must: " + partner_must + "."
         )
 
-        prompt = f"""You are a brutally funny matchmaking AI. Generate a soulmate character for this person.
+        prompt = (
+            "You are a brutally funny matchmaking AI. Generate a soulmate for this person.\n"
+            "RULES:\n"
+            "- Give them what they want but in the most inconvenient real version\n"
+            "- Mirror their worst trait but worse\n"
+            "- Be specific and funny\n"
+            "- Respond in the SAME LANGUAGE as the person answers\n"
+            "- image_prompt must be in English only\n"
+            "PERSON: " + person + "\n"
+            "Return ONLY raw JSON, no markdown, no backticks:\n"
+            '{"name":"X","age":"N","tagline":"X","description":"X","compatibility_note":"X","image_prompt":"X photorealistic portrait photo natural light 35mm candid no illustration no anime"}'
+        )
 
-RULES:
-- Give them what they want (green_flag, partner_must) in the most inconvenient real version
-- Mirror their worst trait (red_flag, bad_habits) but worse
-- Be specific and funny
-- Respond in the same language as the person's answers
-- The image_prompt field must always be in English
+        result = gl.nondet.exec_prompt(prompt)
+        result = result.strip()
 
-PERSON: {person}
-
-Respond with ONLY a JSON object. No markdown. No explanation. No newlines inside string values.
-Use this exact structure:
-{{"name":"NAME","age":"NUMBER","tagline":"FUNNY ONE LINER","description":"2-3 FUNNY SENTENCES","compatibility_note":"ONE SENTENCE","image_prompt":"ENGLISH PHOTO DESCRIPTION photorealistic portrait photo natural light 35mm candid no illustration no anime"}}"""
-
-        result = gl.nondet.exec_prompt(prompt).strip()
-
-        # Strip markdown if present
+        # Remove markdown backticks
         if "```" in result:
-            lines = [l for l in result.split("\n") if not l.strip().startswith("```")]
-            result = "\n".join(lines).strip()
+            result = result.replace("```json", "").replace("```", "").strip()
 
-        # Extract JSON
+        # Find JSON object
         start = result.find("{")
         end = result.rfind("}") + 1
-        if start < 0 or end <= 0:
-            raise ValueError("No JSON found in response")
 
-        obj = json.loads(result[start:end])
+        if start == -1 or end == 0:
+            # Fallback: use raw result as description
+            self.last_match = json.dumps({
+                "name": "Unknown",
+                "age": age,
+                "tagline": "The validators tried their best.",
+                "description": result[:200] if result else "No result.",
+                "compatibility_note": "Fate is mysterious.",
+                "image_prompt": "portrait photo natural light photorealistic"
+            }, ensure_ascii=False)
+            return
 
-        # Ensure all fields present
-        for f in ["name", "age", "tagline", "description", "compatibility_note", "image_prompt"]:
-            if f not in obj:
-                raise ValueError("Missing field: " + f)
+        try:
+            obj = json.loads(result[start:end])
+        except Exception:
+            # Try to fix common JSON issues - truncate to valid JSON
+            chunk = result[start:end]
+            # Remove trailing commas before closing braces
+            import re
+            chunk = re.sub(r',\s*}', '}', chunk)
+            chunk = re.sub(r',\s*]', ']', chunk)
+            obj = json.loads(chunk)
+
+        # Fill missing fields with defaults
+        defaults = {
+            "name": "Mystery",
+            "age": age,
+            "tagline": "Certified chaotic.",
+            "description": "A person of unique qualities.",
+            "compatibility_note": "Chaos attracts chaos.",
+            "image_prompt": "portrait photo natural light photorealistic candid 35mm no illustration"
+        }
+        for key in defaults:
+            if key not in obj or not obj[key]:
+                obj[key] = defaults[key]
 
         self.last_match = json.dumps(obj, ensure_ascii=False, separators=(',', ':'))
 
