@@ -709,7 +709,28 @@ async function fetchResultViaGenCall(txHash, retries = 6, delayMs = 5000) {
 
     } catch(e) {
       console.error('gen_call attempt', attempt, 'error:', e);
-      if (attempt >= retries) { hideWaiting(); alert('Could not fetch result: ' + e.message); goHome(); }
+      if (attempt >= retries) {
+        // Last resort: try reading result from TX itself via eth_getTransactionByHash
+        try {
+          const txResp = await fetch(GENLAYER_RPC, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc:'2.0', id:1, method:'eth_getTransactionByHash', params:[txHash] })
+          }).then(r => r.json());
+          const tx = txResp?.result;
+          if (tx) {
+            const match = extractResultFromTx(tx);
+            if (match) { hideWaiting(); showResult(match); return; }
+            // Try contract_state from consensus_data
+            const validators = tx?.consensus_data?.validators || [];
+            for (const v of validators) {
+              const m = extractFromContractState(v?.contract_state);
+              if (m) { hideWaiting(); showResult(m); return; }
+            }
+          }
+        } catch(ex) { console.error('TX fallback failed:', ex); }
+        hideWaiting();
+        showConsensusFailScreen();
+      }
       else await new Promise(r => setTimeout(r, 4000));
     }
   }
