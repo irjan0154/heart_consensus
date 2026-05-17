@@ -598,7 +598,14 @@ async function pollForResult(txHash) {
         const match = extractResultFromTx(tx);
         if (match) { hideWaiting(); showResult(match); return; }
 
-        // ── Strategy 2: wait a bit and try gen_call ──
+        // ── Strategy 2: check validators contract_state directly ──
+        const validators = tx?.consensus_data?.validators || [];
+        for (const v of validators) {
+          const vm = extractFromContractState(v?.contract_state);
+          if (vm) { hideWaiting(); showResult(vm); return; }
+        }
+
+        // ── Strategy 3: try gen_call as last resort ──
         await fetchResultViaGenCall(txHash);
         return;
       }
