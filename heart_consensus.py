@@ -53,32 +53,27 @@ Respond with ONLY a JSON object. No markdown. No explanation. No newlines inside
 Use this exact structure:
 {{"name":"NAME","age":"NUMBER","tagline":"FUNNY ONE LINER","description":"2-3 FUNNY SENTENCES","compatibility_note":"ONE SENTENCE","image_prompt":"ENGLISH PHOTO DESCRIPTION photorealistic portrait photo natural light 35mm candid no illustration no anime"}}"""
 
-        def generate_match() -> str:
-            raw = gl.nondet.exec_prompt(prompt).strip()
-            # Remove markdown if present
-            if raw.startswith("```"):
-                lines = [l for l in raw.split("\n") if not l.strip().startswith("```")]
-                raw = "\n".join(lines).strip()
-            # Find JSON boundaries
-            start = raw.find("{")
-            end = raw.rfind("}") + 1
-            if start < 0 or end <= 0:
-                raise ValueError("No JSON found")
-            obj = json.loads(raw[start:end])
-            # Ensure all fields present
-            for f in ["name", "age", "tagline", "description", "compatibility_note", "image_prompt"]:
-                if f not in obj:
-                    raise ValueError("Missing field: " + f)
-            # Return compact single-line JSON
-            return json.dumps(obj, ensure_ascii=False, separators=(',', ':'))
+        result = gl.nondet.exec_prompt(prompt).strip()
 
-        self.last_match = gl.eq_principle.prompt_comparative(
-            generate_match,
-            "The outputs are equivalent if both generated soulmates reflect the same "
-            "character type with similar humor and traits. "
-            "Differences in name, exact wording, or minor details are acceptable. "
-            "Both must be valid JSON with all 6 required fields."
-        )
+        # Strip markdown if present
+        if "```" in result:
+            lines = [l for l in result.split("\n") if not l.strip().startswith("```")]
+            result = "\n".join(lines).strip()
+
+        # Extract JSON
+        start = result.find("{")
+        end = result.rfind("}") + 1
+        if start < 0 or end <= 0:
+            raise ValueError("No JSON found in response")
+
+        obj = json.loads(result[start:end])
+
+        # Ensure all fields present
+        for f in ["name", "age", "tagline", "description", "compatibility_note", "image_prompt"]:
+            if f not in obj:
+                raise ValueError("Missing field: " + f)
+
+        self.last_match = json.dumps(obj, ensure_ascii=False, separators=(',', ':'))
 
     @gl.public.view
     def get_last_match(self) -> str:
