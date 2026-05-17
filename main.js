@@ -1,7 +1,7 @@
 // v4
 console.log("%c♥ HeartConsensus loaded", "color:#E8527A;font-weight:bold");
 // ─── CONFIG ───────────────────────────────────────────────
-const CONTRACT_ADDRESS  = '0x4cCE0E59603fF60D75b5c7Dac0e4Ae3C0c7a627F';
+const CONTRACT_ADDRESS  = '0x6E5e682743fEF6EeA9aF57E177FEccf903c01410';
 const GENLAYER_RPC      = 'https://studio.genlayer.com/api';
 const CHAIN_ID          = 61999;
 const CHAIN_ID_HEX      = '0xF22F';
@@ -240,8 +240,16 @@ function extractMatchFromResult(resultB64) {
       return null;
     }
     const payload = raw.slice(1); // GL-encoded return value
+    // Check for empty result (last_match = "")
+    if (payload.length === 0 || (payload.length === 1 && payload[0] === 0)) {
+      console.warn('Empty result — contract returned empty string');
+      return null;
+    }
     const str = glDecodeStr(payload);
-    
+    if (!str || str.trim() === '' || str === '""') {
+      console.warn('Contract returned empty string for last_match');
+      return null;
+    }
     const i = str.indexOf('{'), j = str.lastIndexOf('}');
     if (i !== -1 && j !== -1) return JSON.parse(str.slice(i, j + 1));
   } catch(e) {
