@@ -589,7 +589,7 @@ async function pollForResult(txHash) {
 
       if (attempt % 5 === 1) console.log("%c⏳ Polling attempt " + attempt + " | status: " + status, "color:#aaa");
 
-      const DONE = ['FINALIZED','ACCEPTED','7','5'];
+      const DONE = ['FINALIZED','ACCEPTED','7','5','6'];
       if (status !== undefined && status !== null && DONE.some(s => String(status) === s)) {
         clearInterval(interval);
         console.log("%c✓ TX finalized", "color:#4AE296");
@@ -606,7 +606,13 @@ async function pollForResult(txHash) {
         }
 
         // ── Strategy 3: try gen_call as last resort ──
-        await fetchResultViaGenCall(txHash);
+        try {
+          await fetchResultViaGenCall(txHash);
+        } catch(e) {
+          console.warn('gen_call failed, showing fail screen:', e.message);
+          hideWaiting();
+          showConsensusFailScreen();
+        }
         return;
       }
 
@@ -718,7 +724,7 @@ async function fetchResultViaGenCall(txHash, retries = 6, delayMs = 5000) {
     } catch(e) {
       console.error('gen_call attempt', attempt, 'error:', e);
       if (attempt >= retries) {
-        // Last resort: try reading result from TX itself via eth_getTransactionByHash
+        // Last resort: try reading result from TX itself
         try {
           const txResp = await fetch(GENLAYER_RPC, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -728,7 +734,6 @@ async function fetchResultViaGenCall(txHash, retries = 6, delayMs = 5000) {
           if (tx) {
             const match = extractResultFromTx(tx);
             if (match) { hideWaiting(); showResult(match); return; }
-            // Try contract_state from consensus_data
             const validators = tx?.consensus_data?.validators || [];
             for (const v of validators) {
               const m = extractFromContractState(v?.contract_state);
@@ -738,6 +743,7 @@ async function fetchResultViaGenCall(txHash, retries = 6, delayMs = 5000) {
         } catch(ex) { console.error('TX fallback failed:', ex); }
         hideWaiting();
         showConsensusFailScreen();
+        return;
       }
       else await new Promise(r => setTimeout(r, 4000));
     }
