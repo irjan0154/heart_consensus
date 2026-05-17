@@ -670,11 +670,11 @@ async function fetchResultViaGenCall(txHash, retries = 6, delayMs = 5000) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           jsonrpc: '2.0', id: 1, method: 'gen_call',
-          params: [{
-            to: CONTRACT_ADDRESS,
-            from: walletAddress,
-            data: buildReadCalldata('get_last_match', [])
-          }]
+          params: [
+            CONTRACT_ADDRESS,
+            buildReadCalldata('get_last_match', []),
+            'latest'
+          ]
         })
       }).then(r => r.json());
 
