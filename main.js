@@ -593,6 +593,9 @@ async function pollForResult(txHash) {
       if (status !== undefined && status !== null && DONE.some(s => String(status) === s)) {
         clearInterval(interval);
         console.log("%c✓ TX finalized", "color:#4AE296");
+        console.log('consensus_data:', JSON.stringify(tx?.consensus_data)?.slice(0,300));
+        console.log('leader_receipt:', JSON.stringify(tx?.consensus_data?.leader_receipt)?.slice(0,300));
+        console.log('validators count:', tx?.consensus_data?.validators?.length);
 
         // ── Strategy 1: extract result from leader_receipt in the TX itself ──
         const match = extractResultFromTx(tx);
