@@ -1,7 +1,7 @@
 // v4
 console.log("%c♥ HeartConsensus loaded", "color:#E8527A;font-weight:bold");
 // ─── CONFIG ───────────────────────────────────────────────
-const CONTRACT_ADDRESS  = '0xcD4091a3d581E256F13Bc0A486Df8b270FC94120';
+const CONTRACT_ADDRESS  = '0x6ad810Bd161c56f5600F2e7673A8FD3D61C71b96';
 const GENLAYER_RPC      = 'https://studio.genlayer.com/api';
 const CHAIN_ID          = 61999;
 const CHAIN_ID_HEX      = '0xF22F';
@@ -708,94 +708,106 @@ function scanForMatch(obj, depth = 0) {
   return null;
 }
 
-async function fetchResultViaGenCall(txHash, retries = 6, delayMs = 5000) {
-  // Official GenLayer way: use gen_call with type:"read" to call @gl.public.view method
-  // Response comes in result.data as hex string
-  // First byte = result code: 0x00 = success, then GL-encoded return value
+async function fetchResultViaGenCall(txHash, retries = 8, delayMs = 4000) {
+  // GenLayer studionet gen_call returns result as a hex string directly:
+  // {"jsonrpc":"2.0","result":"<hex>","id":1}
+  // The hex is GL-encoded: first byte is result code (0x00=ok), rest is GL-encoded value
+  // Exit code 0x04 means contract execution error (rollback)
+  // Exit code 0x00 means success
+
   await new Promise(r => setTimeout(r, delayMs));
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      console.log(`gen_call attempt ${attempt}/${retries} — reading get_last_match via gen_call`);
+      console.log(`gen_call attempt ${attempt}/${retries}`);
 
       const calldata = buildReadCalldata('get_last_match', []);
-
-      const body = JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'gen_call',
-        params: [{
-          type: 'read',
-          data: calldata,
-          from: walletAddress,
-          to: CONTRACT_ADDRESS,
-          status: 'finalized'
-        }]
-      });
 
       const resp = await fetch(GENLAYER_RPC, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'gen_call',
+          params: [{
+            type: 'read',
+            data: calldata,
+            from: walletAddress,
+            to: CONTRACT_ADDRESS
+          }]
+        })
       }).then(r => r.json());
 
-      console.log('gen_call raw response:', JSON.stringify(resp)?.slice(0, 300));
+      console.log('gen_call raw response:', JSON.stringify(resp)?.slice(0, 200));
 
       if (resp?.error) {
-        console.warn(`gen_call error attempt ${attempt}:`, resp.error?.message || resp.error);
+        console.warn(`gen_call RPC error attempt ${attempt}:`, resp.error?.message);
         if (attempt < retries) { await new Promise(r => setTimeout(r, 4000)); continue; }
-        throw new Error('gen_call error: ' + JSON.stringify(resp.error));
+        throw new Error('gen_call RPC error: ' + JSON.stringify(resp.error));
       }
 
-      // Per docs: result.data is hex-encoded return value
-      // Per docs: result.status.code 0 = success
-      const statusCode = resp?.result?.status?.code;
-      const hexData = resp?.result?.data;
-
-      console.log('gen_call status code:', statusCode, '| data:', hexData?.slice(0, 60));
-
-      if (statusCode !== 0) {
-        console.warn(`gen_call status not success (code=${statusCode}):`, resp?.result?.status?.message);
-        if (attempt < retries) { await new Promise(r => setTimeout(r, 4000)); continue; }
-        throw new Error('gen_call returned error code: ' + statusCode);
+      // Studionet returns result as a hex string directly (not an object)
+      let hexStr = null;
+      if (typeof resp?.result === 'string') {
+        hexStr = resp.result; // studionet format: "04" or "00<data>"
+      } else if (resp?.result?.data) {
+        hexStr = resp.result.data; // mainnet node format
       }
 
-      if (!hexData || hexData === '00' || hexData === '0x00') {
-        console.warn('gen_call returned empty data — contract state may be empty');
+      if (!hexStr) {
+        console.warn('gen_call: no hex data in response, attempt', attempt);
         if (attempt < retries) { await new Promise(r => setTimeout(r, 4000)); continue; }
-        throw new Error('gen_call returned empty result');
+        throw new Error('gen_call: no data returned');
       }
 
-      // Decode hex → bytes → GL-encoded string
-      const raw = hexData.startsWith('0x') ? hexData.slice(2) : hexData;
+      const raw = hexStr.startsWith('0x') ? hexStr.slice(2) : hexStr;
       const bytes = new Uint8Array(raw.match(/.{2}/g).map(b => parseInt(b, 16)));
 
-      console.log('Decoded bytes length:', bytes.length, '| first byte:', bytes[0]?.toString(16));
+      console.log('bytes length:', bytes.length, '| exit_code byte:', '0x' + bytes[0]?.toString(16));
 
-      // GL-encoded string: tag byte encodes (length << 3) | type=4 (STR)
-      const str = glDecodeStr(bytes);
-      console.log('Decoded string:', str?.slice(0, 100));
+      // byte[0] = exit code: 0x00=success, 0x01=rollback, 0x04=vm/contract error
+      if (bytes[0] !== 0x00) {
+        const errMsg = new TextDecoder().decode(bytes.slice(1));
+        console.warn(`gen_call exit_code=0x${bytes[0].toString(16)}: contract error:`, errMsg.slice(0, 200));
+        // Contract has an error - retry, state might not be written yet
+        if (attempt < retries) { await new Promise(r => setTimeout(r, 5000)); continue; }
+        throw new Error('Contract execution failed with exit_code: 0x' + bytes[0].toString(16));
+      }
+
+      // Success: bytes[1..] are GL-encoded return value
+      const payload = bytes.slice(1);
+      console.log('payload length:', payload.length, '| first byte:', '0x' + payload[0]?.toString(16));
+
+      if (payload.length === 0 || (payload.length === 1 && payload[0] === 0)) {
+        console.warn('gen_call: empty payload (last_match is empty string), retrying...');
+        if (attempt < retries) { await new Promise(r => setTimeout(r, 5000)); continue; }
+        throw new Error('Contract returned empty last_match');
+      }
+
+      const str = glDecodeStr(payload);
+      console.log('decoded string:', str?.slice(0, 150));
 
       if (str && str.trim() && str !== '""') {
         const i = str.indexOf('{'), j = str.lastIndexOf('}');
         if (i !== -1 && j !== -1) {
           try {
             const match = JSON.parse(str.slice(i, j + 1));
-            if (match && match.name) {
-              console.log('%c♥ Match found via gen_call: ' + match.name, 'color:#E8527A');
+            if (match?.name) {
+              console.log('%c♥ Match: ' + match.name, 'color:#E8527A');
               hideWaiting();
               showResult(match);
               return;
             }
-          } catch(e) { console.warn('JSON parse failed:', e); }
+          } catch(e) { console.warn('JSON parse error:', e.message); }
         }
       }
 
       if (attempt < retries) { await new Promise(r => setTimeout(r, 4000)); }
-      else throw new Error('Could not decode gen_call result: ' + JSON.stringify(resp));
+      else throw new Error('Could not parse result: ' + str);
 
     } catch(e) {
-      console.error(`gen_call attempt ${attempt} error:`, e.message || e);
+      console.error(`gen_call attempt ${attempt} threw:`, e.message);
       if (attempt >= retries) {
         hideWaiting();
         showConsensusFailScreen();
