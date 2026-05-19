@@ -571,12 +571,11 @@ async function submitToContract() {
 }
 
 async function pollForResult(txHash) {
-  const maxAttempts = 60;
+  const maxAttempts = 120;
   let attempt = 0;
 
   const interval = setInterval(async () => {
     attempt++;
-    updateWaitingMessage(attempt);
 
     try {
       const resp = await fetch(GENLAYER_RPC, {
@@ -584,16 +583,15 @@ async function pollForResult(txHash) {
         body: JSON.stringify({ jsonrpc:'2.0', id:1, method:'eth_getTransactionByHash', params:[txHash] })
       }).then(r => r.json());
 
-      // Log raw response first time to see structure
-      
-
       const tx = resp?.result;
-      // Try every possible status field location
       const status = tx?.statusName
         ?? tx?.status_name
         ?? tx?.status
         ?? tx?.consensus_data?.status
         ?? tx?.data?.status;
+
+      // Show real network status to user
+      if (status) updateWaitingStatus(String(status));
 
       if (attempt % 5 === 1) console.log("%c⏳ Polling attempt " + attempt + " | status: " + status, "color:#aaa");
 
@@ -918,62 +916,81 @@ function showConsensusFailScreen() {
 }
 
 // ─── WAITING SCREEN ───────────────────────────────────────
-// Messages timed to ~3 min total (60 attempts × 3s = 180s)
-// Each message shown for roughly how many attempts it covers
-const waitingMessages = [
-  { text: "Submitting your profile to the blockchain...", until: 3 },
-  { text: "3 validators are reading your answers...", until: 8 },
-  { text: "Validator #1 is judging you. Lovingly.", until: 14 },
-  { text: "Validator #2 found someone. Oh no.", until: 20 },
-  { text: "Validator #3 disagrees. Loudly.", until: 27 },
-  { text: "They're arguing about your red flag...", until: 34 },
-  { text: "One validator needs a snack break. Rude.", until: 40 },
-  { text: "Two validators have reached consensus...", until: 47 },
-  { text: "Final vote in progress...", until: 54 },
-  { text: "Almost there... ♥", until: 999 }
-];
+// Map real GenLayer network statuses to friendly messages
+const STATUS_MESSAGES = {
+  'PENDING':    'Submitting your profile to the blockchain...',
+  'PROPOSING':  'Validators are reading your answers...',
+  'COMMITTING': 'Validators are reaching consensus...',
+  'REVEALING':  'Revealing the results...',
+  'ACCEPTED':   'Consensus reached! Loading your match...',
+  'FINALIZED':  'Consensus reached! Loading your match...',
+  '1': 'Submitting your profile to the blockchain...',
+  '2': 'Validators are reading your answers...',
+  '3': 'Validators are reaching consensus...',
+  '4': 'Revealing the results...',
+  '5': 'Consensus reached! Loading your match...',
+  '7': 'Consensus reached! Loading your match...',
+};
 
+// Funny flavor lines that rotate every ~10 seconds
+const FLAVOR_LINES = [
+  'Validator #1 is judging you. Lovingly.',
+  'Validator #2 found someone. Oh no.',
+  'Validator #3 disagrees. Loudly.',
+  "They're arguing about your red flag...",
+  'One validator needs a snack break. Rude.',
+  "Two out of three validators can't be wrong.",
+  'The blockchain has seen things.',
+  'Almost there... ♥',
+];
+let _flavorIdx = 0;
+let _flavorTimer = null;
 let _waitingStartTime = null;
-let _waitingTimer = null;
 
 function showWaiting() {
   document.getElementById('waitingScreen').classList.add('open');
   document.body.style.overflow = 'hidden';
   _waitingStartTime = Date.now();
-  _updateWaitingUI(waitingMessages[0].text, 180);
-  // Start live countdown
-  _waitingTimer = setInterval(() => {
-    const elapsed = Math.floor((Date.now() - _waitingStartTime) / 1000);
-    const remaining = Math.max(0, 180 - elapsed);
+  _flavorIdx = 0;
+  _setWaitingUI('Submitting your profile to the blockchain...', FLAVOR_LINES[0]);
+  // Rotate flavor lines every 9 seconds
+  _flavorTimer = setInterval(() => {
+    _flavorIdx = (_flavorIdx + 1) % FLAVOR_LINES.length;
     const msgEl = document.getElementById('waitingMsg');
-    if (msgEl && msgEl._currentText) {
-      _updateWaitingUI(msgEl._currentText, remaining);
+    if (msgEl && msgEl._statusText) {
+      _setWaitingUI(msgEl._statusText, FLAVOR_LINES[_flavorIdx]);
     }
-  }, 1000);
+  }, 9000);
 }
 
-function _updateWaitingUI(text, secondsLeft) {
+function _setWaitingUI(statusText, flavorText) {
   const msgEl = document.getElementById('waitingMsg');
   if (!msgEl) return;
-  msgEl._currentText = text;
-  const mins = Math.floor(secondsLeft / 60);
-  const secs = String(secondsLeft % 60).padStart(2, '0');
-  const timer = secondsLeft > 0 ? ` <span style="opacity:0.45;font-size:0.85em">${mins}:${secs}</span>` : '';
-  msgEl.innerHTML = text + timer;
+  msgEl._statusText = statusText;
+  // Elapsed time (no countdown — just shows how long it has been running)
+  const elapsed = _waitingStartTime ? Math.floor((Date.now() - _waitingStartTime) / 1000) : 0;
+  const mins = Math.floor(elapsed / 60);
+  const secs = String(elapsed % 60).padStart(2, '0');
+  const timer = elapsed > 3 ? ` <span style="opacity:0.4;font-size:0.8em">${mins}:${secs}</span>` : '';
+  msgEl.innerHTML = statusText + timer + '<br><span style="opacity:0.55;font-size:0.85em;font-style:italic">' + flavorText + '</span>';
 }
 
 function hideWaiting() {
   document.getElementById('waitingScreen').classList.remove('open');
-  if (_waitingTimer) { clearInterval(_waitingTimer); _waitingTimer = null; }
+  if (_flavorTimer) { clearInterval(_flavorTimer); _flavorTimer = null; }
 }
 
-function updateWaitingMessage(attempt) {
-  const msg = waitingMessages.find(m => attempt <= m.until) || waitingMessages[waitingMessages.length - 1];
-  const elapsed = _waitingStartTime ? Math.floor((Date.now() - _waitingStartTime) / 1000) : 0;
-  const remaining = Math.max(0, 180 - elapsed);
-  _updateWaitingUI(msg.text, remaining);
+// Called from pollForResult with real network status string
+function updateWaitingStatus(status) {
+  const statusText = STATUS_MESSAGES[status] || STATUS_MESSAGES[status.toUpperCase()] || 'Validators are working...';
+  const msgEl = document.getElementById('waitingMsg');
+  const flavor = msgEl?._statusText === statusText
+    ? (FLAVOR_LINES[_flavorIdx] || '')
+    : FLAVOR_LINES[_flavorIdx];
+  _setWaitingUI(statusText, flavor);
 }
 
+function updateWaitingMessage(attempt) { /* replaced by updateWaitingStatus */ }
 function animateWaiting() {}
 
 // ─── RESULT SCREEN ────────────────────────────────────────
@@ -1046,7 +1063,11 @@ function loadMatchImage(match) {
 
   const encoded = encodeURIComponent(prompt);
   const seed = Math.floor(Math.random() * 99999); // random seed = fresh image each time
-  const url = `https://image.pollinations.ai/prompt/${encoded}?width=512&height=512&nologo=true&seed=${seed}&model=flux`;
+  // Append negative style tags to push away illustration/cartoon look
+  const negative = 'no illustration, no painting, no anime, no cartoon, no cgi, no render, no fantasy art, no concept art, no digital art';
+  const finalPrompt = prompt + '. ' + negative;
+  const encoded2 = encodeURIComponent(finalPrompt);
+  const url = `https://image.pollinations.ai/prompt/${encoded2}?width=512&height=512&nologo=true&seed=${seed}&model=flux-realism`;
 
   console.log('Image URL length:', url.length);
 
@@ -1071,7 +1092,7 @@ function loadMatchImage(match) {
       } else {
         // Final fallback — minimal prompt
         const fb = encodeURIComponent(name + ', ' + age + ' years old, portrait photo, natural light, photorealistic');
-        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux`);
+        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux-realism`);
       }
     }, 30000);
     t.onload = () => { clearTimeout(timeout); applyImage(src); };
@@ -1082,7 +1103,7 @@ function loadMatchImage(match) {
         tryLoad(src.replace(/seed=\d+/, 'seed=' + retrySeed), attempt + 1);
       } else {
         const fb = encodeURIComponent(name + ', ' + age + ' years old, portrait photo, natural light, photorealistic');
-        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux`);
+        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux-realism`);
       }
     };
     t.src = src;
