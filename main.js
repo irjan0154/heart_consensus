@@ -1,7 +1,7 @@
 // v4
 console.log("%c♥ HeartConsensus loaded", "color:#E8527A;font-weight:bold");
 // ─── CONFIG ───────────────────────────────────────────────
-const CONTRACT_ADDRESS  = '0x4a5D05F828aF85292A3Eb559bB6023AEbe01Ca9c';
+const CONTRACT_ADDRESS  = '0x1A1A3482DaE530887Ef8a70Cfb3fb41Bc55c7e8d';
 const GENLAYER_RPC      = 'https://studio.genlayer.com/api';
 const CHAIN_ID          = 61999;
 const CHAIN_ID_HEX      = '0xF22F';
@@ -571,7 +571,7 @@ async function submitToContract() {
 }
 
 async function pollForResult(txHash) {
-  const maxAttempts = 80;
+  const maxAttempts = 60;
   let attempt = 0;
 
   const interval = setInterval(async () => {
@@ -903,27 +903,62 @@ function showConsensusFailScreen() {
 }
 
 // ─── WAITING SCREEN ───────────────────────────────────────
+// Messages timed to ~3 min total (60 attempts × 3s = 180s)
+// Each message shown for roughly how many attempts it covers
 const waitingMessages = [
-  "Submitting your profile to the blockchain...",
-  "3 validators are reading your answers...",
-  "Validator #1 is judging you. Lovingly.",
-  "Validator #2 found someone. Oh no.",
-  "Validator #3 disagrees. Loudly.",
-  "They're arguing about your red flag...",
-  "Two validators have reached consensus...",
-  "Final vote in progress...",
-  "The blockchain has spoken ♥"
+  { text: "Submitting your profile to the blockchain...", until: 3 },
+  { text: "3 validators are reading your answers...", until: 8 },
+  { text: "Validator #1 is judging you. Lovingly.", until: 14 },
+  { text: "Validator #2 found someone. Oh no.", until: 20 },
+  { text: "Validator #3 disagrees. Loudly.", until: 27 },
+  { text: "They're arguing about your red flag...", until: 34 },
+  { text: "One validator needs a snack break. Rude.", until: 40 },
+  { text: "Two validators have reached consensus...", until: 47 },
+  { text: "Final vote in progress...", until: 54 },
+  { text: "Almost there... ♥", until: 999 }
 ];
+
+let _waitingStartTime = null;
+let _waitingTimer = null;
+
 function showWaiting() {
   document.getElementById('waitingScreen').classList.add('open');
   document.body.style.overflow = 'hidden';
-  document.getElementById('waitingMsg').textContent = waitingMessages[0];
+  _waitingStartTime = Date.now();
+  _updateWaitingUI(waitingMessages[0].text, 180);
+  // Start live countdown
+  _waitingTimer = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - _waitingStartTime) / 1000);
+    const remaining = Math.max(0, 180 - elapsed);
+    const msgEl = document.getElementById('waitingMsg');
+    if (msgEl && msgEl._currentText) {
+      _updateWaitingUI(msgEl._currentText, remaining);
+    }
+  }, 1000);
 }
-function hideWaiting() { document.getElementById('waitingScreen').classList.remove('open'); }
+
+function _updateWaitingUI(text, secondsLeft) {
+  const msgEl = document.getElementById('waitingMsg');
+  if (!msgEl) return;
+  msgEl._currentText = text;
+  const mins = Math.floor(secondsLeft / 60);
+  const secs = String(secondsLeft % 60).padStart(2, '0');
+  const timer = secondsLeft > 0 ? ` <span style="opacity:0.45;font-size:0.85em">${mins}:${secs}</span>` : '';
+  msgEl.innerHTML = text + timer;
+}
+
+function hideWaiting() {
+  document.getElementById('waitingScreen').classList.remove('open');
+  if (_waitingTimer) { clearInterval(_waitingTimer); _waitingTimer = null; }
+}
+
 function updateWaitingMessage(attempt) {
-  const idx = Math.min(Math.floor(attempt / 3), waitingMessages.length - 1);
-  document.getElementById('waitingMsg').textContent = waitingMessages[idx];
+  const msg = waitingMessages.find(m => attempt <= m.until) || waitingMessages[waitingMessages.length - 1];
+  const elapsed = _waitingStartTime ? Math.floor((Date.now() - _waitingStartTime) / 1000) : 0;
+  const remaining = Math.max(0, 180 - elapsed);
+  _updateWaitingUI(msg.text, remaining);
 }
+
 function animateWaiting() {}
 
 // ─── RESULT SCREEN ────────────────────────────────────────
