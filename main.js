@@ -1028,7 +1028,7 @@ function loadMatchImage(match) {
   } else if (fullText.match(/work|spreadsheet|deadline|meeting|office|career|boss|salary/)) {
     prompt += ', sunken hollow eyes with dark purple circles, grey pallid skin, thinning stress-damaged hair, hunched over multiple laptops at 3am, dozens of empty coffee cups, fluorescent light, has not seen sunlight in weeks';
   } else if (fullText.match(/game|gaming|console|minecraft|stream|esport|twitch|discord/)) {
-    prompt += ', ghost-pale pasty skin, squinting red eyes from screen glare, surrounded by towers of energy drink cans, gaming chair with permanent body imprint, hasn't left the room in weeks, dark room lit only by monitor glow';
+    prompt += ', ghost-pale pasty skin, squinting red eyes from screen glare, surrounded by towers of energy drink cans, gaming chair with permanent body imprint, has not left the room in weeks, dark room lit only by monitor glow';
   }
 
   // Always enforce photorealism — strip any illustration hints
