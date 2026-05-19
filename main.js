@@ -1063,12 +1063,18 @@ function loadMatchImage(match) {
 
   const encoded = encodeURIComponent(prompt);
   const seed = Math.floor(Math.random() * 99999); // random seed = fresh image each time
-  // Anchor prompt with photo-first prefix — this overrides model's art tendencies
-  const photoPrefix = 'RAW photo, DSLR, 85mm f/1.8 portrait lens, sharp focus on face, natural ambient light, real person, ';
-  const negative = ', --no illustration painting anime cartoon cgi render fantasy concept digital-art watercolor sketch';
-  const finalPrompt = photoPrefix + prompt + negative;
+  // Strip any cinematic/render language from LLM prompt, replace with photo anchors
+  let cleanPrompt = prompt
+    .replace(/cinematic|dramatic lighting|render|3d|cgi|studio lighting|octane|unreal engine|hyper.?realistic/gi, '')
+    .replace(/photorealistic portrait,?/gi, '')
+    .trim();
+
+  // Build photo-first prompt: person description + strict photo anchors
+  const finalPrompt = 'candid street photography, ' + cleanPrompt
+    + ', shot on Sony A7IV, 85mm, f/2.0, natural daylight, real person, hyperrealistic photograph'
+    + ', --no cgi render painting illustration anime cartoon 3d artwork digital-art';
   const encoded2 = encodeURIComponent(finalPrompt);
-  const url = `https://image.pollinations.ai/prompt/${encoded2}?width=512&height=640&nologo=true&seed=${seed}&model=flux-realism&enhance=false`;
+  const url = `https://image.pollinations.ai/prompt/${encoded2}?width=512&height=640&nologo=true&seed=${seed}&model=flux-pro&enhance=false`;
 
   console.log('Image URL length:', url.length);
 
@@ -1093,7 +1099,7 @@ function loadMatchImage(match) {
       } else {
         // Final fallback — minimal prompt
         const fb = encodeURIComponent(name + ', ' + age + ' years old, portrait photo, natural light, photorealistic');
-        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux-realism`);
+        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux-pro`);
       }
     }, 30000);
     t.onload = () => { clearTimeout(timeout); applyImage(src); };
@@ -1104,7 +1110,7 @@ function loadMatchImage(match) {
         tryLoad(src.replace(/seed=\d+/, 'seed=' + retrySeed), attempt + 1);
       } else {
         const fb = encodeURIComponent(name + ', ' + age + ' years old, portrait photo, natural light, photorealistic');
-        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux-realism`);
+        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux-pro`);
       }
     };
     t.src = src;
