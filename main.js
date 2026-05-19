@@ -1,7 +1,7 @@
 // v4
 console.log("%c♥ HeartConsensus loaded", "color:#E8527A;font-weight:bold");
 // ─── CONFIG ───────────────────────────────────────────────
-const CONTRACT_ADDRESS  = '0xCB9280c74531F024b75eB06366b2a577f25C3e4c';
+const CONTRACT_ADDRESS  = '0x8030DD61B5d4D2D7507fB8905A56CED642A647f0';
 const GENLAYER_RPC      = 'https://studio.genlayer.com/api';
 const CHAIN_ID          = 61999;
 const CHAIN_ID_HEX      = '0xF22F';
