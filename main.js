@@ -708,7 +708,7 @@ function scanForMatch(obj, depth = 0) {
   return null;
 }
 
-async function fetchResultViaGenCall(txHash, retries = 8, delayMs = 4000) {
+async function fetchResultViaGenCall(txHash, retries = 12, delayMs = 8000) {
   // GenLayer studionet gen_call returns result as a hex string directly:
   // {"jsonrpc":"2.0","result":"<hex>","id":1}
   // The hex is GL-encoded: first byte is result code (0x00=ok), rest is GL-encoded value
@@ -766,12 +766,27 @@ async function fetchResultViaGenCall(txHash, retries = 8, delayMs = 4000) {
 
       console.log('bytes length:', bytes.length, '| exit_code byte:', '0x' + bytes[0]?.toString(16));
 
-      // byte[0] = exit code: 0x00=success, 0x01=rollback, 0x04=vm/contract error
+      // byte[0] = exit code: 0x00=success, 0x04=state not yet committed
       if (bytes[0] !== 0x00) {
         const errMsg = new TextDecoder().decode(bytes.slice(1));
-        console.warn(`gen_call exit_code=0x${bytes[0].toString(16)}: contract error:`, errMsg.slice(0, 200));
-        // Contract has an error - retry, state might not be written yet
-        if (attempt < retries) { await new Promise(r => setTimeout(r, 5000)); continue; }
+        console.warn(`gen_call exit_code=0x${bytes[0].toString(16)}:`, errMsg.slice(0, 300));
+
+        // On studionet exit code 0x04 = state not committed yet, BUT
+        // the response body often already contains the JSON result — try to extract it
+        const ei = errMsg.indexOf('{'), ej = errMsg.lastIndexOf('}');
+        if (ei !== -1 && ej !== -1) {
+          try {
+            const match = JSON.parse(errMsg.slice(ei, ej + 1));
+            if (match && match.name && match.description) {
+              console.log('%c\u2665 Match extracted from 0x04 body: ' + match.name, 'color:#E8527A');
+              hideWaiting();
+              showResult(match);
+              return;
+            }
+          } catch(e2) { /* not valid JSON yet, keep retrying */ }
+        }
+
+        if (attempt < retries) { await new Promise(r => setTimeout(r, 8000)); continue; }
         throw new Error('Contract execution failed with exit_code: 0x' + bytes[0].toString(16));
       }
 
