@@ -1,7 +1,7 @@
 // v4
 console.log("%c♥ HeartConsensus loaded", "color:#E8527A;font-weight:bold");
 // ─── CONFIG ───────────────────────────────────────────────
-const CONTRACT_ADDRESS  = '0x1A1A3482DaE530887Ef8a70Cfb3fb41Bc55c7e8d';
+const CONTRACT_ADDRESS  = '0x57A7c39920861774C3d69174B727c8ed60a47b2F';
 const GENLAYER_RPC      = 'https://studio.genlayer.com/api';
 const CHAIN_ID          = 61999;
 const CHAIN_ID_HEX      = '0xF22F';
@@ -1012,15 +1012,34 @@ function loadMatchImage(match) {
   const isMostlyRussian = cyrillicCount / totalCount > 0.3;
 
   if (!prompt || isMostlyRussian) {
-    // Build a solid English prompt from structured data
     prompt = `${name}, ${age} years old, realistic candid portrait photo, natural light, 35mm lens, photorealistic, no illustration, no anime, no cartoon`;
   }
 
-  // Truncate to max 600 chars (safer limit)
-  if (prompt.length > 600) {
-    prompt = prompt.slice(0, 600);
+  // Boost exaggeration based on keywords in description/tagline
+  const fullText = ((match.description || '') + ' ' + (match.tagline || '') + ' ' + prompt).toLowerCase();
+  if (fullText.match(/alcohol|drink|beer|vodka|drunk|brewery|lager|hangover|bottle/)) {
+    prompt += ', extremely weathered face, red bulbous nose, broken capillaries on cheeks, bleary bloodshot eyes, disheveled greasy hair, stained shirt, holding a bottle, shot at noon in a messy apartment';
+  } else if (fullText.match(/eat|food|fat|obese|buffet|snack|calorie|burger|pizza|hungry/)) {
+    prompt += ', extremely obese body, very round bloated face, massive double chin, small eyes buried in puffy cheeks, food stains on oversized shirt, sitting in a reinforced chair surrounded by empty takeout boxes';
+  } else if (fullText.match(/lazy|couch|sofa|sleep|nap|tired|sloth|Netflix|remote/)) {
+    prompt += ', pale doughy soft skin, unwashed limp greasy hair, heavy baggy eyes, wearing same clothes for days, completely melted into a worn-out sagging couch, surrounded by chip bags and remote controls';
+  } else if (fullText.match(/gym|muscle|workout|fitness|protein|gains|lift|bicep/)) {
+    prompt += ', grotesquely oversized bulging muscles, tiny head on enormous body, neck wider than head, veins covering every surface, wearing a tank top 4 sizes too small, can barely move arms';
+  } else if (fullText.match(/work|spreadsheet|deadline|meeting|office|career|boss|salary/)) {
+    prompt += ', sunken hollow eyes with dark purple circles, grey pallid skin, thinning stress-damaged hair, hunched over multiple laptops at 3am, dozens of empty coffee cups, fluorescent light, has not seen sunlight in weeks';
+  } else if (fullText.match(/game|gaming|console|minecraft|stream|esport|twitch|discord/)) {
+    prompt += ', ghost-pale pasty skin, squinting red eyes from screen glare, surrounded by towers of energy drink cans, gaming chair with permanent body imprint, hasn't left the room in weeks, dark room lit only by monitor glow';
+  }
+
+  // Always enforce photorealism — strip any illustration hints
+  prompt = prompt.replace(/illustration|cartoon|anime|drawing|painting|digital art/gi, '');
+  prompt += ', photorealistic, 35mm portrait lens, natural light, ultra detailed, shot on Canon EOS R5';
+
+  // Truncate to max 700 chars
+  if (prompt.length > 700) {
+    prompt = prompt.slice(0, 700);
     const lastSpace = prompt.lastIndexOf(' ');
-    if (lastSpace > 400) prompt = prompt.slice(0, lastSpace);
+    if (lastSpace > 500) prompt = prompt.slice(0, lastSpace);
   }
 
   console.log('Final image prompt:', prompt);
