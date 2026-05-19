@@ -1063,11 +1063,12 @@ function loadMatchImage(match) {
 
   const encoded = encodeURIComponent(prompt);
   const seed = Math.floor(Math.random() * 99999); // random seed = fresh image each time
-  // Append negative style tags to push away illustration/cartoon look
-  const negative = 'no illustration, no painting, no anime, no cartoon, no cgi, no render, no fantasy art, no concept art, no digital art';
-  const finalPrompt = prompt + '. ' + negative;
+  // Anchor prompt with photo-first prefix — this overrides model's art tendencies
+  const photoPrefix = 'RAW photo, DSLR, 85mm f/1.8 portrait lens, sharp focus on face, natural ambient light, real person, ';
+  const negative = ', --no illustration painting anime cartoon cgi render fantasy concept digital-art watercolor sketch';
+  const finalPrompt = photoPrefix + prompt + negative;
   const encoded2 = encodeURIComponent(finalPrompt);
-  const url = `https://image.pollinations.ai/prompt/${encoded2}?width=512&height=512&nologo=true&seed=${seed}&model=flux-realism`;
+  const url = `https://image.pollinations.ai/prompt/${encoded2}?width=512&height=640&nologo=true&seed=${seed}&model=flux-realism&enhance=false`;
 
   console.log('Image URL length:', url.length);
 
