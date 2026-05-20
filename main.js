@@ -1,7 +1,7 @@
 // v4
 console.log("%c♥ HeartConsensus loaded", "color:#E8527A;font-weight:bold");
 // ─── CONFIG ───────────────────────────────────────────────
-const CONTRACT_ADDRESS  = '0x8030DD61B5d4D2D7507fB8905A56CED642A647f0';
+const CONTRACT_ADDRESS  = '0xffBb20f17433d007272141Be71cfCEe854Eac2e4';
 const GENLAYER_RPC      = 'https://studio.genlayer.com/api';
 const CHAIN_ID          = 61999;
 const CHAIN_ID_HEX      = '0xF22F';
@@ -261,15 +261,20 @@ function extractMatchFromResult(resultB64) {
 // ─── STATE ────────────────────────────────────────────────
 const questions = [
   "How old are you?",
+  "Your gender?",
   "How would your ex describe you in 3 words?",
   "Saturday 2pm. Where are you and who are you with?",
   "Alone time is... (finish the sentence)",
   "If your outfit could talk, what would it say?",
   "What do you secretly judge people for?",
   "Your last impulse purchase?",
-  "What's your biggest red flag? (be honest)",
+  "What's your worst quality? (be honest)",
   "What's your biggest fear in a relationship?",
-  "Describe your perfect partner in one sentence"
+  "Describe your perfect partner in one sentence",
+  "Your relationship with money?",
+  "How do you react to conflict?",
+  "What do you do when you're bored?",
+  "When someone asks 'how are you', you say..."
 ];
 let current = 0;
 const answers = [];
@@ -541,7 +546,7 @@ async function submitToContract() {
     return;
   }
 
-  const argValues = answers.slice(0, 10);
+  const argValues = answers.slice(0, 15);
 
   try {
     // _txData for consensus = RLP([glEncode(calldata), leaderOnly])
@@ -1068,8 +1073,12 @@ function loadMatchImage(match) {
     .replace(/cinematic|dramatic lighting|render|3d|cgi|studio lighting|octane|unreal engine|hyper.?realistic|photorealistic portrait,?/gi, '')
     .trim();
 
+  // Gender from user's answer (question index 1)
+  const genderAnswer = (match._gender || answers[1] || '').toLowerCase();
+  const genderPrefix = /female|woman|женщ|девушка|она|female/i.test(genderAnswer) ? 'woman, ' : 'man, ';
+
   // Photo-first prefix: most important words go first
-  const finalPrompt = 'photograph of a real person, shot on Canon EOS R5, 85mm lens, f/1.8, soft natural light, sharp face, '
+  const finalPrompt = 'photograph of a real ' + genderPrefix + 'shot on Canon EOS R5, 85mm lens, f/1.8, soft natural light, sharp face, '
     + cleanPrompt
     + ', realistic skin texture, real photo, not a painting, not cgi, not illustration';
   const encoded2 = encodeURIComponent(finalPrompt);
