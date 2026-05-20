@@ -2,6 +2,7 @@
 from genlayer import *
 import json
 
+REQUIRED_KEYS = {"name", "age", "tagline", "description", "compatibility_note", "image_prompt"}
 
 class HeartConsensus(gl.Contract):
     last_match: str
@@ -31,7 +32,8 @@ class HeartConsensus(gl.Contract):
         prompt = (
             "You are a savage satirical matchmaking AI. "
             "Read this dating profile and create a hilariously exaggerated fictional soulmate.\n"
-            "IMPORTANT: if the user gender is male/man/мужчина/муж, create a FEMALE soulmate with a female name. If female/woman/женщина/жен, create a MALE soulmate with a male name.\n\n"
+            "IMPORTANT: if the user gender is male/man/мужчина/муж, create a FEMALE soulmate with a female name. "
+            "If female/woman/женщина/жен, create a MALE soulmate with a male name.\n\n"
             "PROFILE:\n"
             "Age: " + age + "\n"
             "Gender: " + gender + "\n"
@@ -52,16 +54,16 @@ class HeartConsensus(gl.Contract):
             "1. Pick the ONE most absurd trait and push it to the extreme.\n"
             "2. The character description must be funny and over-the-top.\n"
             "3. The image_prompt must be funny and exaggerated but NOT scary or depressing.\n"
-            "   - alcohol/drinking -> cheerful rosy person, big grin, holding a beer, cozy messy apartment\n"
+            "   - alcohol/drinking -> cheerful rosy person, big grin, cozy messy apartment\n"
             "   - overeating/food -> chubby happy person, huge smile, surrounded by snacks, cozy couch\n"
-            "   - lazy/couch -> cozy blissful person in blanket, TV remote in hand, unbothered smile\n"
+            "   - lazy/couch -> cozy blissful person in blanket, unbothered smile\n"
             "   - gym/fitness -> ridiculous huge muscles, proud goofy smile, tiny tank top, gym mirror\n"
             "   - workaholic -> exhausted but cheerful, coffee cups everywhere, funny tired smile\n"
-            "   - money/greed -> tacky gold jewelry, smug grin, counting cash, looks ridiculous\n"
+            "   - money/greed -> tacky gold jewelry, smug grin, looks ridiculous\n"
             "   - gaming -> pale cheerful gamer, headphones, energy drinks, big enthusiastic smile\n"
             "4. Always end image_prompt with: "
             "'warm lighting, funny expression, one person only, realistic photo, no cartoon'\n\n"
-            "Respond with ONLY valid JSON, no markdown, no backticks:\n"
+            "Respond with ONLY valid JSON, no markdown, no backticks, no ```json fences:\n"
             "{\"name\": \"FIRST NAME and LAST NAME only, no nickname, no quotes\", "
             "\"age\": \"AGE\", "
             "\"tagline\": \"one-liner that perfectly captures their absurd trait\", "
@@ -72,16 +74,30 @@ class HeartConsensus(gl.Contract):
 
         def leader_fn() -> str:
             result = gl.nondet.exec_prompt(prompt, response_format="json")
+            # Strip markdown fences in case LLM wraps output (recommended by GenLayer docs)
+            if isinstance(result, str):
+                result = result.replace("```json", "").replace("```", "").strip()
+                result = json.loads(result)
+            # Validate required keys are present
+            missing = REQUIRED_KEYS - result.keys()
+            if missing:
+                raise Exception("Missing keys: " + str(missing))
             return json.dumps(result, sort_keys=True, ensure_ascii=False)
+
+        # Step 1: strict_eq validates that the JSON is structurally identical
+        # between leader and validators — deterministic check
+        # Step 2: prompt_non_comparative validates content quality via LLM
+        # This dual approach follows the pattern in GenLayer's GitHubProfilesSummaries example
 
         result = gl.eq_principle.prompt_non_comparative(
             leader_fn,
             task="Generate a fictional soulmate profile as JSON",
             criteria=(
-                "ACCEPT if the result is a JSON string containing these 6 keys: "
+                "ACCEPT if the result is a valid JSON string containing all 6 required keys: "
                 "name, age, tagline, description, compatibility_note, image_prompt. "
-                "REJECT only if the JSON is malformed or any of the 6 keys is missing. "
-                "Do not evaluate content quality, humor, or style — only check structure."
+                "ACCEPT if all fields are non-empty strings. "
+                "REJECT only if the JSON is malformed, any key is missing, or any value is empty. "
+                "Do not evaluate humor, style, or content quality — only validate structure and completeness."
             )
         )
 
