@@ -1035,13 +1035,13 @@ function loadMatchImage(match) {
   // Boost exaggeration based on keywords in description/tagline
   const fullText = ((match.description || '') + ' ' + (match.tagline || '') + ' ' + prompt).toLowerCase();
   if (fullText.match(/alcohol|drink|beer|vodka|drunk|brewery|lager|hangover|bottle/)) {
-    prompt += ', extremely weathered face, red bulbous nose, broken capillaries on cheeks, bleary bloodshot eyes, disheveled greasy hair, stained shirt, holding a bottle, shot at noon in a messy apartment';
+    prompt += ', man aged 38-45, red puffy nose, mild broken capillaries on cheeks, slightly bloated face, disheveled hair, wrinkled shirt, holding a beer bottle, sitting on a couch in an ordinary messy apartment at noon, looks cheerful but tired, natural window light';
   } else if (fullText.match(/eat|food|fat|obese|buffet|snack|calorie|burger|pizza|hungry/)) {
-    prompt += ', extremely obese body, very round bloated face, massive double chin, small eyes buried in puffy cheeks, food stains on oversized shirt, sitting in a reinforced chair surrounded by empty takeout boxes';
+    prompt += ', very overweight person sitting on a sagging couch at home, empty pizza boxes and snack wrappers on the floor, stained t-shirt, watching TV, messy living room, ordinary apartment, soft lamp light';
   } else if (fullText.match(/lazy|couch|sofa|sleep|nap|tired|sloth|Netflix|remote/)) {
     prompt += ', pale doughy soft skin, unwashed limp greasy hair, heavy baggy eyes, wearing same clothes for days, completely melted into a worn-out sagging couch, surrounded by chip bags and remote controls';
   } else if (fullText.match(/gym|muscle|workout|fitness|protein|gains|lift|bicep/)) {
-    prompt += ', grotesquely oversized bulging muscles, tiny head on enormous body, neck wider than head, veins covering every surface, wearing a tank top 4 sizes too small, can barely move arms';
+    prompt += ', extremely muscular bodybuilder, enormous arms and shoulders, tiny waist, thick neck, veins on arms, wearing a small tight tank top, standing in a gym, looks proud and slightly ridiculous, no food, natural gym lighting';
   } else if (fullText.match(/work|spreadsheet|deadline|meeting|office|career|boss|salary/)) {
     prompt += ', sunken hollow eyes with dark purple circles, grey pallid skin, thinning stress-damaged hair, hunched over multiple laptops at 3am, dozens of empty coffee cups, fluorescent light, has not seen sunlight in weeks';
   } else if (fullText.match(/game|gaming|console|minecraft|stream|esport|twitch|discord/)) {
@@ -1063,18 +1063,17 @@ function loadMatchImage(match) {
 
   const encoded = encodeURIComponent(prompt);
   const seed = Math.floor(Math.random() * 99999); // random seed = fresh image each time
-  // Strip any cinematic/render language from LLM prompt, replace with photo anchors
+  // Strip render/art keywords that push model toward CGI
   let cleanPrompt = prompt
-    .replace(/cinematic|dramatic lighting|render|3d|cgi|studio lighting|octane|unreal engine|hyper.?realistic/gi, '')
-    .replace(/photorealistic portrait,?/gi, '')
+    .replace(/cinematic|dramatic lighting|render|3d|cgi|studio lighting|octane|unreal engine|hyper.?realistic|photorealistic portrait,?/gi, '')
     .trim();
 
-  // Build photo-first prompt: person description + strict photo anchors
-  const finalPrompt = 'candid street photography, ' + cleanPrompt
-    + ', shot on Sony A7IV, 85mm, f/2.0, natural daylight, real person, hyperrealistic photograph'
-    + ', --no cgi render painting illustration anime cartoon 3d artwork digital-art';
+  // Photo-first prefix: most important words go first
+  const finalPrompt = 'photograph of a real person, shot on Canon EOS R5, 85mm lens, f/1.8, soft natural light, sharp face, '
+    + cleanPrompt
+    + ', realistic skin texture, real photo, not a painting, not cgi, not illustration';
   const encoded2 = encodeURIComponent(finalPrompt);
-  const url = `https://image.pollinations.ai/prompt/${encoded2}?width=512&height=640&nologo=true&seed=${seed}&model=flux-pro&enhance=false`;
+  const url = `https://image.pollinations.ai/prompt/${encoded2}?width=512&height=640&nologo=true&seed=${seed}&model=turbo&enhance=false`;
 
   console.log('Image URL length:', url.length);
 
@@ -1099,7 +1098,7 @@ function loadMatchImage(match) {
       } else {
         // Final fallback — minimal prompt
         const fb = encodeURIComponent(name + ', ' + age + ' years old, portrait photo, natural light, photorealistic');
-        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux-pro`);
+        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=turbo`);
       }
     }, 30000);
     t.onload = () => { clearTimeout(timeout); applyImage(src); };
@@ -1110,7 +1109,7 @@ function loadMatchImage(match) {
         tryLoad(src.replace(/seed=\d+/, 'seed=' + retrySeed), attempt + 1);
       } else {
         const fb = encodeURIComponent(name + ', ' + age + ' years old, portrait photo, natural light, photorealistic');
-        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux-pro`);
+        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=turbo`);
       }
     };
     t.src = src;
