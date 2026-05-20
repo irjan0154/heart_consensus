@@ -573,7 +573,7 @@ async function submitToContract() {
 }
 
 async function pollForResult(txHash) {
-  const maxAttempts = 120;
+  const maxAttempts = 100;
   let attempt = 0;
 
   const interval = setInterval(async () => {
@@ -952,21 +952,33 @@ function showWaiting() {
   _waitingStartTime = Date.now();
   _flavorIdx = 0;
   _setWaitingUI('Submitting your profile to the blockchain...', FLAVOR_LINES[0]);
-  // Rotate flavor lines every 9 seconds
+  // Update timer every second, rotate flavor lines every 9 seconds
+  let _tickCount = 0;
   _flavorTimer = setInterval(() => {
-    _flavorIdx = (_flavorIdx + 1) % FLAVOR_LINES.length;
+    _tickCount++;
+    if (_tickCount % 9 === 0) {
+      _flavorIdx = (_flavorIdx + 1) % FLAVOR_LINES.length;
+    }
     const msgEl = document.getElementById('waitingMsg');
     if (msgEl && msgEl._statusText) {
       _setWaitingUI(msgEl._statusText, FLAVOR_LINES[_flavorIdx]);
     }
-  }, 9000);
+  }, 1000);
 }
 
 function _setWaitingUI(statusText, flavorText) {
   const msgEl = document.getElementById('waitingMsg');
   if (!msgEl) return;
   msgEl._statusText = statusText;
-  msgEl.innerHTML = statusText + '<br><span style="opacity:0.55;font-size:0.85em;font-style:italic">' + flavorText + '</span>';
+  const elapsed = _waitingStartTime ? Math.floor((Date.now() - _waitingStartTime) / 1000) : 0;
+  const remaining = Math.max(0, 300 - elapsed);
+  const mins = Math.floor(remaining / 60);
+  const secs = String(remaining % 60).padStart(2, '0');
+  const timerColor = remaining < 60 ? '#E8527A' : 'rgba(100,100,120,0.5)';
+  msgEl.innerHTML = statusText
+    + '<br><span style="opacity:0.55;font-size:0.85em;font-style:italic">' + flavorText + '</span>'
+    + '<br><span style="font-size:0.8em;font-variant-numeric:tabular-nums;color:' + timerColor + ';margin-top:4px;display:inline-block">'
+    + mins + ':' + secs + '</span>';
 }
 
 function hideWaiting() {
