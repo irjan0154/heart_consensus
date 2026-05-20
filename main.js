@@ -1077,10 +1077,13 @@ function loadMatchImage(match) {
   const genderAnswer = (match._gender || answers[1] || '').toLowerCase();
   const genderPrefix = /female|woman|женщ|девушка|она|female/i.test(genderAnswer) ? 'woman, ' : 'man, ';
 
-  // Photo-first prefix: most important words go first
-  const finalPrompt = 'photograph of a real ' + genderPrefix + 'shot on Canon EOS R5, 85mm lens, f/1.8, soft natural light, sharp face, '
+  // Photo-first prefix: funny and expressive, not dark/scary
+  const finalPrompt = 'portrait photo of one single ' + genderPrefix
+    + 'funny and expressive face, slight smirk, '
     + cleanPrompt
-    + ', realistic skin texture, real photo, not a painting, not cgi, not illustration';
+    + ', warm indoor lighting, sharp focus on face, only one person in frame, '
+    + 'realistic but comical, not scary, not dirty, not depressing, '
+    + 'real photo, not cgi, not painting, not illustration';
   const encoded2 = encodeURIComponent(finalPrompt);
   const url = `https://image.pollinations.ai/prompt/${encoded2}?width=512&height=640&nologo=true&seed=${seed}&model=turbo&enhance=false`;
 
