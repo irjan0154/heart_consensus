@@ -1078,13 +1078,20 @@ function loadMatchImage(match) {
   const userIsFemale = /female|woman|girl|женщ|девушка|она/i.test(genderAnswer);
   const genderPrefix = userIsFemale ? 'man, ' : 'woman, ';
 
-  // Instagram-style candid portrait
-  const finalPrompt = 'candid Instagram photo of one ' + genderPrefix
-    + 'natural expression, caught in the moment, '
+  // Strip anything that causes extra hands/fingers
+  cleanPrompt = cleanPrompt
+    .replace(/holding [^,]+,?/gi, '')
+    .replace(/counting cash/gi, '')
+    .replace(/hands [^,]+,?/gi, '')
+    .trim();
+
+  const finalPrompt = 'portrait photo of one ' + genderPrefix
+    + 'face and upper body only, arms at sides, '
     + cleanPrompt
-    + ', shot on iPhone 15 Pro, soft natural light, slightly imperfect composition, '
-    + 'feels like a real person, warm tones, one person only, '
-    + 'photo not painting, not cgi, not staged';
+    + ', shot on Canon EOS R5, 85mm lens, f/1.8, soft natural light, '
+    + 'sharp focus on face, one person only, realistic skin texture, '
+    + 'no extra limbs, no extra hands, no extra fingers, '
+    + 'real photo, not cgi, not painting, not illustration';
   const encoded2 = encodeURIComponent(finalPrompt);
   const url = `https://image.pollinations.ai/prompt/${encoded2}?width=512&height=640&nologo=true&seed=${seed}&model=turbo&enhance=false`;
 
@@ -1111,7 +1118,7 @@ function loadMatchImage(match) {
       } else {
         // Final fallback — minimal prompt
         const fb = encodeURIComponent(name + ', ' + age + ' years old, portrait photo, natural light, photorealistic');
-        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux`);
+        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux-realism`);
       }
     }, 30000);
     t.onload = () => { clearTimeout(timeout); applyImage(src); };
@@ -1122,7 +1129,7 @@ function loadMatchImage(match) {
         tryLoad(src.replace(/seed=\d+/, 'seed=' + retrySeed), attempt + 1);
       } else {
         const fb = encodeURIComponent(name + ', ' + age + ' years old, portrait photo, natural light, photorealistic');
-        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux`);
+        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux-realism`);
       }
     };
     t.src = src;
