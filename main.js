@@ -1,7 +1,7 @@
 // v4
 console.log("%c♥ HeartConsensus loaded", "color:#E8527A;font-weight:bold");
 // ─── CONFIG ───────────────────────────────────────────────
-const CONTRACT_ADDRESS  = '0xB5cB2511709Dad502a36a68D09e690c951F2B60a';
+const CONTRACT_ADDRESS  = '0x30B76909f37b8f7b38bAa28A80AAD4699aF297be';
 const GENLAYER_RPC      = 'https://studio.genlayer.com/api';
 const CHAIN_ID          = 61999;
 const CHAIN_ID_HEX      = '0xF22F';
@@ -236,18 +236,15 @@ function extractMatchFromResult(resultB64) {
     if (raw[0] !== 0) {
       // Not a successful return — show error payload as text
       const msg = new TextDecoder().decode(raw.slice(1));
-      console.warn('Contract error payload:', msg);
       return null;
     }
     const payload = raw.slice(1); // GL-encoded return value
     // Check for empty result (last_match = "")
     if (payload.length === 0 || (payload.length === 1 && payload[0] === 0)) {
-      console.warn('Empty result — contract returned empty string');
       return null;
     }
     const str = glDecodeStr(payload);
     if (!str || str.trim() === '' || str === '""') {
-      console.warn('Contract returned empty string for last_match');
       return null;
     }
     const i = str.indexOf('{'), j = str.lastIndexOf('}');
@@ -313,7 +310,6 @@ async function getCurrentChainId() {
 async function isOnCorrectNetwork() {
   const id = await getCurrentChainId();
   if (id !== CHAIN_ID) {
-    console.warn('[Network] Wrong chain. Got:', id, 'Need:', CHAIN_ID);
     return false;
   }
   return true;
@@ -563,8 +559,6 @@ async function submitToContract() {
       method: 'eth_sendTransaction',
       params: [{ from: walletAddress, to: CONSENSUS_CONTRACT, data: encodedCall, gas: '0x' + (500000).toString(16) }]
     });
-
-    console.log("%c→ TX sent: " + txHash, "color:#E8527A");
     animateWaiting();
     await pollForResult(txHash);
   } catch(e) {
@@ -598,12 +592,9 @@ async function pollForResult(txHash) {
       // Show real network status to user
       if (status) updateWaitingStatus(String(status));
 
-      if (attempt % 5 === 1) console.log("%c⏳ Polling attempt " + attempt + " | status: " + status, "color:#aaa");
-
       const DONE = ['FINALIZED','ACCEPTED','7','5','6'];
       if (status !== undefined && status !== null && DONE.some(s => String(status) === s)) {
         clearInterval(interval);
-        console.log('%c✓ TX finalized — reading result via gen_call', 'color:#4AE296');
 
         // Official GenLayer approach: after write TX finalizes, read state via gen_call
         try {
@@ -659,7 +650,6 @@ function extractFromContractState(contractState) {
       const obj = JSON.parse(candidate);
       // Validate it has expected match fields
       if (obj.name && obj.age && obj.tagline && obj.description) {
-        console.log("%c♥ Match found in contract_state: " + obj.name, "color:#E8527A");
         return obj;
       }
     } catch(e) { /* not JSON, skip */ }
@@ -722,7 +712,6 @@ async function fetchResultViaGenCall(txHash, retries = 12, delayMs = 8000) {
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      console.log(`gen_call attempt ${attempt}/${retries}`);
 
       const calldata = buildReadCalldata('get_last_match', []);
 
@@ -742,8 +731,6 @@ async function fetchResultViaGenCall(txHash, retries = 12, delayMs = 8000) {
         })
       }).then(r => r.json());
 
-      console.log('gen_call raw response:', JSON.stringify(resp)?.slice(0, 200));
-
       if (resp?.error) {
         console.warn(`gen_call RPC error attempt ${attempt}:`, resp.error?.message);
         if (attempt < retries) { await new Promise(r => setTimeout(r, 4000)); continue; }
@@ -759,15 +746,12 @@ async function fetchResultViaGenCall(txHash, retries = 12, delayMs = 8000) {
       }
 
       if (!hexStr) {
-        console.warn('gen_call: no hex data in response, attempt', attempt);
-        if (attempt < retries) { await new Promise(r => setTimeout(r, 4000)); continue; }
+          if (attempt < retries) { await new Promise(r => setTimeout(r, 4000)); continue; }
         throw new Error('gen_call: no data returned');
       }
 
       const raw = hexStr.startsWith('0x') ? hexStr.slice(2) : hexStr;
       const bytes = new Uint8Array(raw.match(/.{2}/g).map(b => parseInt(b, 16)));
-
-      console.log('bytes length:', bytes.length, '| exit_code byte:', '0x' + bytes[0]?.toString(16));
 
       // byte[0] = exit code: 0x00=success, 0x04=state not yet committed
       if (bytes[0] !== 0x00) {
@@ -781,7 +765,6 @@ async function fetchResultViaGenCall(txHash, retries = 12, delayMs = 8000) {
           try {
             const match = JSON.parse(errMsg.slice(ei, ej + 1));
             if (match && match.name && match.description) {
-              console.log('%c\u2665 Match extracted from 0x04 body: ' + match.name, 'color:#E8527A');
               hideWaiting();
               showResult(match);
               return;
@@ -795,7 +778,6 @@ async function fetchResultViaGenCall(txHash, retries = 12, delayMs = 8000) {
 
       // Success: bytes[1..] are GL-encoded return value
       const payload = bytes.slice(1);
-      console.log('payload length:', payload.length, '| first byte:', '0x' + payload[0]?.toString(16));
 
       if (payload.length === 0 || (payload.length === 1 && payload[0] === 0)) {
         console.warn('gen_call: empty payload (last_match is empty string), retrying...');
@@ -804,7 +786,6 @@ async function fetchResultViaGenCall(txHash, retries = 12, delayMs = 8000) {
       }
 
       const str = glDecodeStr(payload);
-      console.log('decoded string:', str?.slice(0, 150));
 
       if (str && str.trim() && str !== '""') {
         const i = str.indexOf('{'), j = str.lastIndexOf('}');
@@ -812,7 +793,6 @@ async function fetchResultViaGenCall(txHash, retries = 12, delayMs = 8000) {
           try {
             const match = JSON.parse(str.slice(i, j + 1));
             if (match?.name) {
-              console.log('%c♥ Match: ' + match.name, 'color:#E8527A');
               hideWaiting();
               showResult(match);
               return;
@@ -942,10 +922,17 @@ const FLAVOR_LINES = [
   'Validator #1 is judging you. Lovingly.',
   'Validator #2 found someone. Oh no.',
   'Validator #3 disagrees. Loudly.',
+  'Well, this is a challenge...',
+  'Validators are squeezing every last brain cell.',
+  'The validators have called an emergency session.',
+  'Your profile broke the first two validators. Working on the third.',
   "They're arguing about your red flag...",
-  'One validator needs a snack break. Rude.',
-  "Two out of three validators can't be wrong.",
-  'The blockchain has seen things.',
+  'Consensus is hard. So is love.',
+  'Rebooting validator #2... please hold.',
+  'The validators have never seen anything like this.',
+  'Someone in a server rack is blushing right now.',
+  "One validator just said 'oh they\'re perfect for each other'.",
+  'The algorithm is concerned but committed.',
   'Almost there... ♥',
 ];
 let _flavorIdx = 0;
@@ -972,12 +959,7 @@ function _setWaitingUI(statusText, flavorText) {
   const msgEl = document.getElementById('waitingMsg');
   if (!msgEl) return;
   msgEl._statusText = statusText;
-  // Elapsed time (no countdown — just shows how long it has been running)
-  const elapsed = _waitingStartTime ? Math.floor((Date.now() - _waitingStartTime) / 1000) : 0;
-  const mins = Math.floor(elapsed / 60);
-  const secs = String(elapsed % 60).padStart(2, '0');
-  const timer = elapsed > 3 ? ` <span style="opacity:0.4;font-size:0.8em">${mins}:${secs}</span>` : '';
-  msgEl.innerHTML = statusText + timer + '<br><span style="opacity:0.55;font-size:0.85em;font-style:italic">' + flavorText + '</span>';
+  msgEl.innerHTML = statusText + '<br><span style="opacity:0.55;font-size:0.85em;font-style:italic">' + flavorText + '</span>';
 }
 
 function hideWaiting() {
@@ -1064,8 +1046,6 @@ function loadMatchImage(match) {
     if (lastSpace > 500) prompt = prompt.slice(0, lastSpace);
   }
 
-  console.log('Final image prompt:', prompt);
-
   const encoded = encodeURIComponent(prompt);
   const seed = Math.floor(Math.random() * 99999); // random seed = fresh image each time
   // Strip render/art keywords that push model toward CGI
@@ -1075,8 +1055,10 @@ function loadMatchImage(match) {
 
   // Gender from user's answer — soulmate is OPPOSITE gender
   const genderAnswer = (match._gender || answers[1] || '').toLowerCase();
-  const userIsFemale = /female|woman|girl|женщ|девушка|она/i.test(genderAnswer);
-  const genderPrefix = userIsFemale ? 'man, ' : 'woman, ';
+  const userIsFemale = /female|woman|girl|женщ|девушка|она|жен|\bж\b|\bf\b/i.test(genderAnswer);
+  const userIsMale = /male|man|boy|мужч|парень|он|муж|\bм\b|\bm\b/i.test(genderAnswer);
+  // If explicitly male -> female partner, if explicitly female -> male partner, default -> female
+  const genderPrefix = userIsFemale ? 'man, ' : (userIsMale ? 'woman, ' : 'woman, ');
 
   // Strip anything that causes extra hands/fingers
   cleanPrompt = cleanPrompt
@@ -1094,8 +1076,6 @@ function loadMatchImage(match) {
   const encoded2 = encodeURIComponent(finalPrompt);
   const url = `https://image.pollinations.ai/prompt/${encoded2}?width=512&height=640&nologo=true&seed=${seed}&model=turbo&enhance=false`;
 
-  console.log('Image URL length:', url.length);
-
   function applyImage(src) {
     img.src = src;
     img.style.opacity = '1';
@@ -1111,7 +1091,6 @@ function loadMatchImage(match) {
     const timeout = setTimeout(() => {
       t.src = '';
       if (attempt < 3) {
-        console.log('Image timeout, retry attempt', attempt + 1);
         const retrySeed = Math.floor(Math.random() * 99999);
         tryLoad(src.replace(/seed=\d+/, 'seed=' + retrySeed), attempt + 1);
       } else {
