@@ -1,7 +1,7 @@
 // v4
 console.log("%c♥ HeartConsensus loaded", "color:#E8527A;font-weight:bold");
 // ─── CONFIG ───────────────────────────────────────────────
-const CONTRACT_ADDRESS  = '0xffBb20f17433d007272141Be71cfCEe854Eac2e4';
+const CONTRACT_ADDRESS  = '0xB5cB2511709Dad502a36a68D09e690c951F2B60a';
 const GENLAYER_RPC      = 'https://studio.genlayer.com/api';
 const CHAIN_ID          = 61999;
 const CHAIN_ID_HEX      = '0xF22F';
@@ -1040,17 +1040,17 @@ function loadMatchImage(match) {
   // Boost exaggeration based on keywords in description/tagline
   const fullText = ((match.description || '') + ' ' + (match.tagline || '') + ' ' + prompt).toLowerCase();
   if (fullText.match(/alcohol|drink|beer|vodka|drunk|brewery|lager|hangover|bottle/)) {
-    prompt += ', man aged 38-45, red puffy nose, mild broken capillaries on cheeks, slightly bloated face, disheveled hair, wrinkled shirt, holding a beer bottle, sitting on a couch in an ordinary messy apartment at noon, looks cheerful but tired, natural window light';
+    prompt += ', cheerful rosy-cheeked person in their 40s, slightly disheveled hair, cozy worn tracksuit, holding a beer mug with a big grin, sitting in a warm cluttered living room, friendly and funny expression, soft lamp light';
   } else if (fullText.match(/eat|food|fat|obese|buffet|snack|calorie|burger|pizza|hungry/)) {
-    prompt += ', very overweight person sitting on a sagging couch at home, empty pizza boxes and snack wrappers on the floor, stained t-shirt, watching TV, messy living room, ordinary apartment, soft lamp light';
+    prompt += ', chubby cheerful person with a big happy smile, sitting on a cozy couch surrounded by snack bags, wearing a comfy oversized hoodie, looks very content and relaxed, warm living room lighting, funny and lovable expression';
   } else if (fullText.match(/lazy|couch|sofa|sleep|nap|tired|sloth|Netflix|remote/)) {
-    prompt += ', pale doughy soft skin, unwashed limp greasy hair, heavy baggy eyes, wearing same clothes for days, completely melted into a worn-out sagging couch, surrounded by chip bags and remote controls';
+    prompt += ', cozy person wrapped in a blanket on a sofa, sleepy half-closed eyes, holding a TV remote, surrounded by pillows, looks blissfully unbothered, warm golden lamp light, funny relaxed expression';
   } else if (fullText.match(/gym|muscle|workout|fitness|protein|gains|lift|bicep/)) {
-    prompt += ', extremely muscular bodybuilder, enormous arms and shoulders, tiny waist, thick neck, veins on arms, wearing a small tight tank top, standing in a gym, looks proud and slightly ridiculous, no food, natural gym lighting';
+    prompt += ', extremely muscular person with a proud goofy smile, wearing a tiny tank top, flexing in a gym mirror, looks ridiculous but happy, bright gym lighting, comical expression';
   } else if (fullText.match(/work|spreadsheet|deadline|meeting|office|career|boss|salary/)) {
-    prompt += ', sunken hollow eyes with dark purple circles, grey pallid skin, thinning stress-damaged hair, hunched over multiple laptops at 3am, dozens of empty coffee cups, fluorescent light, has not seen sunlight in weeks';
+    prompt += ', exhausted but cheerful office worker surrounded by coffee cups and papers, wearing a wrinkled shirt with a loose tie, funny tired smile, warm office lighting, looks like they have not slept but are oddly happy about it';
   } else if (fullText.match(/game|gaming|console|minecraft|stream|esport|twitch|discord/)) {
-    prompt += ', ghost-pale pasty skin, squinting red eyes from screen glare, surrounded by towers of energy drink cans, gaming chair with permanent body imprint, has not left the room in weeks, dark room lit only by monitor glow';
+    prompt += ', pale cheerful gamer sitting in a gaming chair, wearing headphones around neck, surrounded by energy drink cans, big enthusiastic smile, dark room lit by monitor glow, funny and endearing expression';
   }
 
   // Always enforce photorealism — strip any illustration hints
@@ -1073,9 +1073,10 @@ function loadMatchImage(match) {
     .replace(/cinematic|dramatic lighting|render|3d|cgi|studio lighting|octane|unreal engine|hyper.?realistic|photorealistic portrait,?/gi, '')
     .trim();
 
-  // Gender from user's answer (question index 1)
+  // Gender from user's answer — soulmate is OPPOSITE gender
   const genderAnswer = (match._gender || answers[1] || '').toLowerCase();
-  const genderPrefix = /female|woman|женщ|девушка|она|female/i.test(genderAnswer) ? 'woman, ' : 'man, ';
+  const userIsFemale = /female|woman|girl|женщ|девушка|она/i.test(genderAnswer);
+  const genderPrefix = userIsFemale ? 'man, ' : 'woman, ';
 
   // Photo-first prefix: funny and expressive, not dark/scary
   const finalPrompt = 'portrait photo of one single ' + genderPrefix
