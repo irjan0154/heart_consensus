@@ -1086,11 +1086,11 @@ function loadMatchImage(match) {
     .replace(/hands [^,]+,?/gi, '')
     .trim();
 
-  const finalPrompt = 'close-up portrait photo of one ' + genderPrefix
-    + 'head and shoulders only, tight crop, no hands visible, '
+  const finalPrompt = 'extreme close-up face portrait of one ' + genderPrefix
+    + 'face and neck only, cropped just below chin, no shoulders, no arms, no hands, '
     + cleanPrompt
     + ', shot on Canon EOS R5, 85mm lens, f/1.8, soft natural light, '
-    + 'sharp focus on face, one person only, realistic skin texture, '
+    + 'sharp focus on eyes and face, one person only, realistic skin texture, '
     + 'real photo, not cgi, not painting, not illustration';
   const encoded2 = encodeURIComponent(finalPrompt);
   const url = `https://image.pollinations.ai/prompt/${encoded2}?width=512&height=640&nologo=true&seed=${seed}&model=turbo&enhance=false`;
