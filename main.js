@@ -1078,13 +1078,13 @@ function loadMatchImage(match) {
   const userIsFemale = /female|woman|girl|женщ|девушка|она/i.test(genderAnswer);
   const genderPrefix = userIsFemale ? 'man, ' : 'woman, ';
 
-  // Photo-first prefix: funny and expressive, not dark/scary
-  const finalPrompt = 'portrait photo of one single ' + genderPrefix
-    + 'funny and expressive face, slight smirk, '
+  // Instagram-style candid portrait
+  const finalPrompt = 'candid Instagram photo of one ' + genderPrefix
+    + 'natural expression, caught in the moment, '
     + cleanPrompt
-    + ', warm indoor lighting, sharp focus on face, only one person in frame, '
-    + 'realistic but comical, not scary, not dirty, not depressing, '
-    + 'real photo, not cgi, not painting, not illustration';
+    + ', shot on iPhone 15 Pro, soft natural light, slightly imperfect composition, '
+    + 'feels like a real person, warm tones, one person only, '
+    + 'photo not painting, not cgi, not staged';
   const encoded2 = encodeURIComponent(finalPrompt);
   const url = `https://image.pollinations.ai/prompt/${encoded2}?width=512&height=640&nologo=true&seed=${seed}&model=turbo&enhance=false`;
 
@@ -1111,7 +1111,7 @@ function loadMatchImage(match) {
       } else {
         // Final fallback — minimal prompt
         const fb = encodeURIComponent(name + ', ' + age + ' years old, portrait photo, natural light, photorealistic');
-        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=turbo`);
+        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux`);
       }
     }, 30000);
     t.onload = () => { clearTimeout(timeout); applyImage(src); };
@@ -1122,7 +1122,7 @@ function loadMatchImage(match) {
         tryLoad(src.replace(/seed=\d+/, 'seed=' + retrySeed), attempt + 1);
       } else {
         const fb = encodeURIComponent(name + ', ' + age + ' years old, portrait photo, natural light, photorealistic');
-        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=turbo`);
+        applyImage(`https://image.pollinations.ai/prompt/${fb}?width=512&height=512&nologo=true&model=flux`);
       }
     };
     t.src = src;
