@@ -884,8 +884,8 @@ function showConsensusFailScreen() {
     <h2 style="font-family:'DM Sans',sans-serif;font-size:22px;color:#1a1a2e;margin:0;">
       Consensus failed.
     </h2>
-    <p style="font-family:'DM Sans',sans-serif;font-size:15px;color:#666;max-width:320px;line-height:1.6;margin:0;">
-      The validators reviewed your answers and simply gave up.
+    <p style="font-family:'DM Sans',sans-serif;font-size:15px;color:#666;max-width:360px;line-height:1.6;margin:0;">
+      The validators reviewed your answers and simply gave up. We can't blame them — you're a lot to process. But somewhere out there is a soulmate worthy of your chaos. Fill in the form again. The validators will try harder this time. Probably.
     </p>
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
       <button onclick="document.getElementById('failScreen').remove(); resetAndRetry();"
