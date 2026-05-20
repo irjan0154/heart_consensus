@@ -547,6 +547,7 @@ async function submitToContract() {
   try {
     // _txData for consensus = RLP([glEncode(calldata), leaderOnly])
     const txData = buildWriteCalldata('find_soulmate', argValues);
+    console.log('%c→ Sending transaction...', 'color:#E8527A');
     
 
     // Encode addTransaction(sender, recipient, numValidators, maxRotations, txData)
@@ -560,6 +561,8 @@ async function submitToContract() {
       params: [{ from: walletAddress, to: CONSENSUS_CONTRACT, data: encodedCall, gas: '0x' + (500000).toString(16) }]
     });
     animateWaiting();
+    console.log('%c→ TX sent: ' + txHash, 'color:#E8527A');
+    console.log('%c→ TX sent: ' + txHash, 'color:#E8527A');
     await pollForResult(txHash);
   } catch(e) {
     console.error(e);
@@ -591,12 +594,16 @@ async function pollForResult(txHash) {
 
       // Show real network status to user
       if (status) updateWaitingStatus(String(status));
+      console.log('%c⏳ Polling attempt ' + attempt + ' | status: ' + status, 'color:#aaa');
 
+      if (attempt % 5 === 1) console.log('%c⏳ Polling attempt ' + attempt + ' | status: ' + status, 'color:#aaa');
       const DONE = ['FINALIZED','ACCEPTED','7','5','6'];
       if (status !== undefined && status !== null && DONE.some(s => String(status) === s)) {
         clearInterval(interval);
 
         // Official GenLayer approach: after write TX finalizes, read state via gen_call
+        console.log('%c✓ TX finalized — reading result via gen_call', 'color:#4AE296');
+        console.log('%c✓ TX finalized — reading result via gen_call', 'color:#4AE296');
         try {
           await fetchResultViaGenCall(txHash);
         } catch(e) {
