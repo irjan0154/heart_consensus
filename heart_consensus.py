@@ -31,7 +31,7 @@ class HeartConsensus(gl.Contract):
         prompt = (
             "You are a savage satirical matchmaking AI. "
             "Read this dating profile and create a hilariously exaggerated fictional soulmate.\n"
-            "IMPORTANT: if the user gender is male, create a FEMALE soulmate. If female, create a MALE soulmate.\n\n"
+            "IMPORTANT: if the user gender is male/man/мужчина/муж, create a FEMALE soulmate with a female name. If female/woman/женщина/жен, create a MALE soulmate with a male name.\n\n"
             "PROFILE:\n"
             "Age: " + age + "\n"
             "Gender: " + gender + "\n"
