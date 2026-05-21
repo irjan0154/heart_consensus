@@ -1053,7 +1053,7 @@ function loadMatchImage(match) {
   } else if (fullText.match(/game|gaming|console|minecraft|stream|esport|twitch|discord/)) {
     prompt += ', pale slightly gaunt cheerful gamer, squinting eyes from screen glare, energy drink cans and gaming setup covering background, big enthusiastic grin, dark room lit only by monitor glow, funny endearing expression, hands not visible';
   } else if (fullText.match(/money|gold|rich|cash|wealth|spend|expensive|luxury/)) {
-    prompt += ', person aged 48-55, thick gold chain visible around neck, slightly smug confident grin, flashy but tacky clothing, receding hairline, slight double chin, expensive watch glimpsed at wrist but hands not visible, warm indoor lighting with hint of excess';
+    prompt += ', person aged 48-55, thick gold chain around neck, slightly smug confident grin, flashy tacky clothing, receding hairline, slight double chin, warm indoor lighting, face and chest only, no hands, no wrists, no rings, no watch';
   }
 
   // Always enforce photorealism — strip any illustration hints
@@ -1089,7 +1089,7 @@ function loadMatchImage(match) {
     .trim();
 
   const finalPrompt = 'extreme close-up face portrait of one ' + genderPrefix
-    + 'face and neck only, cropped just below chin, no shoulders, no arms, no hands, '
+    + 'face and neck only, cropped at collarbone, no shoulders, no arms, no hands, no wrists, no fingers, no rings, '
     + cleanPrompt
     + ', shot on Canon EOS R5, 85mm lens, f/1.8, soft natural light, '
     + 'sharp focus on eyes and face, one person only, realistic skin texture, '
