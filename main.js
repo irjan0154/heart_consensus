@@ -1080,7 +1080,7 @@ function loadMatchImage(match) {
   // Boost exaggeration based on keywords in description/tagline
   const fullText = ((match.description || '') + ' ' + (match.tagline || '') + ' ' + prompt).toLowerCase();
   if (fullText.match(/alcohol|drink|beer|vodka|drunk|brewery|lager|hangover|bottle/)) {
-    prompt += ', cheerful person aged 45-52, slightly red puffy nose, rosy cheeks, messy unwashed hair, wrinkled untucked shirt, a couple days of stubble, warm friendly grin, beer bottles and empty cans visible on table in background, cluttered lived-in apartment, soft lamp light, hands not visible';
+    prompt += ', cheerful person aged 48-56, visibly weathered face, slightly red puffy nose, rosy broken-capillary cheeks, puffy eyes, messy unwashed hair, deep smile lines, wrinkled untucked shirt, looks like they have not slept properly in years but are happy about it, beer bottles and empty cans visible in background, cluttered lived-in apartment, soft lamp light, hands not visible';
   } else if (fullText.match(/eat|food|fat|obese|buffet|snack|calorie|burger|pizza|hungry/)) {
     prompt += ', visibly overweight cheerful person, round chubby face with full cheeks, wide happy smile, wearing a slightly stretched oversized hoodie, pizza boxes and snack bags visible in background, looks deeply content and relaxed, warm cozy living room lighting, hands not visible';
   } else if (fullText.match(/lazy|couch|sofa|sleep|nap|tired|sloth|Netflix|remote/)) {
