@@ -537,28 +537,32 @@ function showConfirmScreen() {
   const el = document.createElement('div');
   el.id = 'confirmScreen';
   el.style.cssText = 'position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;'
-    + 'background:rgba(255,245,248,0.97);flex-direction:column;gap:20px;padding:32px;text-align:center;';
+    + 'background:rgba(26,10,20,0.55);backdrop-filter:blur(4px);';
 
   el.innerHTML = `
-    <div style="font-size:44px">⚖️</div>
-    <h2 style="font-family:'DM Sans',sans-serif;font-size:22px;color:#1a1a2e;margin:0;">
-      The council has been summoned.
-    </h2>
-    <p style="font-family:'DM Sans',sans-serif;font-size:15px;color:#555;max-width:360px;line-height:1.7;margin:0;">
-      Your answers are in. The validators are now locked in heated debate about who deserves you.
-      This usually takes 1–2 minutes. Occasionally they need a coffee break. Max 5 minutes.
-    </p>
-    <button onclick="document.getElementById('confirmScreen').remove(); submitToContract();"
-      style="margin-top:8px;padding:14px 36px;background:linear-gradient(135deg,#E8527A,#c73d63);
-      color:white;border:none;border-radius:100px;font-size:16px;font-family:'DM Sans',sans-serif;
-      font-weight:600;cursor:pointer;letter-spacing:0.02em;">
-      Summon My Match
-    </button>
-    <button onclick="document.getElementById('confirmScreen').remove(); document.getElementById('quizScreen').classList.add('open');"
-      style="padding:10px 24px;background:transparent;color:#999;border:1px solid #ddd;
-      border-radius:100px;font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer;">
-      ← Go Back
-    </button>
+    <div style="background:white;border-radius:24px;padding:36px 32px;max-width:380px;width:90%;
+      text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px;
+      box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+      <div style="font-size:40px">⚖️</div>
+      <h2 style="font-family:'DM Sans',sans-serif;font-size:20px;color:#1a1a2e;margin:0;">
+        The council has been summoned.
+      </h2>
+      <p style="font-family:'DM Sans',sans-serif;font-size:14px;color:#666;line-height:1.7;margin:0;">
+        Your answers are in. The validators are now locked in heated debate about who deserves you.
+        This usually takes 1–2 minutes. Occasionally they need a coffee break. Max 5 minutes.
+      </p>
+      <button onclick="document.getElementById('confirmScreen').remove(); submitToContract();"
+        style="margin-top:4px;width:100%;padding:14px;background:linear-gradient(135deg,#E8527A,#c73d63);
+        color:white;border:none;border-radius:100px;font-size:15px;font-family:'DM Sans',sans-serif;
+        font-weight:600;cursor:pointer;letter-spacing:0.02em;">
+        Summon My Match
+      </button>
+      <button onclick="document.getElementById('confirmScreen').remove(); document.getElementById('quizScreen').classList.add('open');"
+        style="padding:10px 24px;background:transparent;color:#aaa;border:1px solid #eee;
+        border-radius:100px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;width:100%;">
+        ← Go Back
+      </button>
+    </div>
   `;
 
   document.body.appendChild(el);
@@ -1124,7 +1128,8 @@ function loadMatchImage(match) {
     .trim();
 
   const finalPrompt = 'extreme close-up face portrait of one ' + genderPrefix
-    + 'face and neck only, cropped at collarbone, no shoulders, no arms, no hands, no wrists, no fingers, no rings, '
+    + 'face and neck only, both hands behind back, no hands near face, no hands visible anywhere, '
+    + 'cropped at collarbone, no arms, no wrists, no fingers, no rings, '
     + cleanPrompt
     + ', shot on Canon EOS R5, 85mm lens, f/1.8, soft natural light, '
     + 'sharp focus on eyes and face, one person only, realistic skin texture, '
