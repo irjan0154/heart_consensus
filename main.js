@@ -518,7 +518,7 @@ function quizNext() {
       showTooYoungScreen();
       return;
     }
-    submitToContract();
+    showConfirmScreen();
   }
 }
 function quizBack() { if (current > 0) { current--; updateQuiz(); } }
@@ -527,6 +527,41 @@ function goHome() {
   document.getElementById('resultScreen').classList.remove('open');
   document.body.style.overflow = '';
   current = 0; answers.length = 0;
+}
+
+// ─── CONFIRM SCREEN ──────────────────────────────────────
+function showConfirmScreen() {
+  const existing = document.getElementById('confirmScreen');
+  if (existing) existing.remove();
+
+  const el = document.createElement('div');
+  el.id = 'confirmScreen';
+  el.style.cssText = 'position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;'
+    + 'background:rgba(255,245,248,0.97);flex-direction:column;gap:20px;padding:32px;text-align:center;';
+
+  el.innerHTML = `
+    <div style="font-size:44px">⚖️</div>
+    <h2 style="font-family:'DM Sans',sans-serif;font-size:22px;color:#1a1a2e;margin:0;">
+      The council has been summoned.
+    </h2>
+    <p style="font-family:'DM Sans',sans-serif;font-size:15px;color:#555;max-width:360px;line-height:1.7;margin:0;">
+      Your answers are in. The validators are now locked in heated debate about who deserves you.
+      This usually takes 1–2 minutes. Occasionally they need a coffee break. Max 5 minutes.
+    </p>
+    <button onclick="document.getElementById('confirmScreen').remove(); submitToContract();"
+      style="margin-top:8px;padding:14px 36px;background:linear-gradient(135deg,#E8527A,#c73d63);
+      color:white;border:none;border-radius:100px;font-size:16px;font-family:'DM Sans',sans-serif;
+      font-weight:600;cursor:pointer;letter-spacing:0.02em;">
+      Summon My Match
+    </button>
+    <button onclick="document.getElementById('confirmScreen').remove(); document.getElementById('quizScreen').classList.add('open');"
+      style="padding:10px 24px;background:transparent;color:#999;border:1px solid #ddd;
+      border-radius:100px;font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer;">
+      ← Go Back
+    </button>
+  `;
+
+  document.body.appendChild(el);
 }
 
 // ─── CONTRACT ─────────────────────────────────────────────
