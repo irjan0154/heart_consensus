@@ -1041,17 +1041,19 @@ function loadMatchImage(match) {
   // Boost exaggeration based on keywords in description/tagline
   const fullText = ((match.description || '') + ' ' + (match.tagline || '') + ' ' + prompt).toLowerCase();
   if (fullText.match(/alcohol|drink|beer|vodka|drunk|brewery|lager|hangover|bottle/)) {
-    prompt += ', cheerful rosy-cheeked person in their 40s, slightly disheveled hair, cozy worn tracksuit, holding a beer mug with a big grin, sitting in a warm cluttered living room, friendly and funny expression, soft lamp light';
+    prompt += ', cheerful person aged 45-52, slightly red puffy nose, rosy cheeks, messy unwashed hair, wrinkled untucked shirt, a couple days of stubble, warm friendly grin, beer bottles and empty cans visible on table in background, cluttered lived-in apartment, soft lamp light, hands not visible';
   } else if (fullText.match(/eat|food|fat|obese|buffet|snack|calorie|burger|pizza|hungry/)) {
-    prompt += ', chubby cheerful person with a big happy smile, sitting on a cozy couch surrounded by snack bags, wearing a comfy oversized hoodie, looks very content and relaxed, warm living room lighting, funny and lovable expression';
+    prompt += ', visibly overweight cheerful person, round chubby face with full cheeks, wide happy smile, wearing a slightly stretched oversized hoodie, pizza boxes and snack bags visible in background, looks deeply content and relaxed, warm cozy living room lighting, hands not visible';
   } else if (fullText.match(/lazy|couch|sofa|sleep|nap|tired|sloth|Netflix|remote/)) {
-    prompt += ', cozy person wrapped in a blanket on a sofa, sleepy half-closed eyes, holding a TV remote, surrounded by pillows, looks blissfully unbothered, warm golden lamp light, funny relaxed expression';
+    prompt += ', cozy person wrapped in a thick blanket, heavy sleepy half-closed eyes, slightly puffy face, unwashed hair, pillows and TV remote visible in background, looks blissfully unbothered, warm golden lamp light, funny relaxed expression, hands not visible';
   } else if (fullText.match(/gym|muscle|workout|fitness|protein|gains|lift|bicep/)) {
-    prompt += ', extremely muscular person with a proud goofy smile, wearing a tiny tank top, flexing in a gym mirror, looks ridiculous but happy, bright gym lighting, comical expression';
+    prompt += ', extremely muscular person with oversized arms and thick neck, proud slightly ridiculous grin, wearing a tiny tight tank top, gym equipment and protein shakers visible in background, looks comically huge but happy, bright gym lighting, hands not visible';
   } else if (fullText.match(/work|spreadsheet|deadline|meeting|office|career|boss|salary/)) {
-    prompt += ', exhausted but cheerful office worker surrounded by coffee cups and papers, wearing a wrinkled shirt with a loose tie, funny tired smile, warm office lighting, looks like they have not slept but are oddly happy about it';
+    prompt += ', exhausted but cheerful office worker, dark circles under eyes, slightly disheveled hair, wrinkled shirt with loosened tie, towers of coffee cups and papers piled up in background, funny tired proud smile, fluorescent office lighting, hands not visible';
   } else if (fullText.match(/game|gaming|console|minecraft|stream|esport|twitch|discord/)) {
-    prompt += ', pale cheerful gamer sitting in a gaming chair, wearing headphones around neck, surrounded by energy drink cans, big enthusiastic smile, dark room lit by monitor glow, funny and endearing expression';
+    prompt += ', pale slightly gaunt cheerful gamer, squinting eyes from screen glare, energy drink cans and gaming setup covering background, big enthusiastic grin, dark room lit only by monitor glow, funny endearing expression, hands not visible';
+  } else if (fullText.match(/money|gold|rich|cash|wealth|spend|expensive|luxury/)) {
+    prompt += ', person aged 48-55, thick gold chain visible around neck, slightly smug confident grin, flashy but tacky clothing, receding hairline, slight double chin, expensive watch glimpsed at wrist but hands not visible, warm indoor lighting with hint of excess';
   }
 
   // Always enforce photorealism — strip any illustration hints
